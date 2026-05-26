@@ -1,0 +1,47 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Native",
+  "version": "0.2.0",
+  "identifier": "com.wolfgames.native",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "bun run dev",
+    "beforeBuildCommand": "bun run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Native",
+        "label": "main",
+        "transparent": true,
+        "decorations": false,
+        "fullscreen": false,
+        "resizable": true,
+        "width": 800,
+        "height": 600
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "macOSPrivateApi": true
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "frameworks": [
+        "target/release/libonnxruntime.1.17.1.dylib",
+        "target/release/libsherpa-onnx-c-api.dylib"
+      ],
+      "dmg": {
+        "windowSize": { "width": 660, "height": 400 },
+        "appPosition": { "x": 180, "y": 170 },
+        "applicationFolderPosition": { "x": 480, "y": 170 }
+      }
+    }
+  },
+  "plugins": {}
+}

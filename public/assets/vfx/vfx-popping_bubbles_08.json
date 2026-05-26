@@ -1,0 +1,9 @@
+{
+  "frames": 63,
+  "cols": 8,
+  "rows": 8,
+  "frameWidth": 256,
+  "frameHeight": 144,
+  "atlasWidth": 2048,
+  "atlasHeight": 1152
+}

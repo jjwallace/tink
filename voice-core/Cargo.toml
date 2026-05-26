@@ -1,0 +1,21 @@
+[package]
+name = "voice-core"
+version = "0.1.0"
+edition = "2021"
+description = "Shared TTS / STT / LLM engine for Wolf voice apps (native, companion)."
+
+[lib]
+name = "voice_core"
+crate-type = ["rlib"]
+
+[dependencies]
+# Audio I/O — same versions native uses, so the shared types match.
+sherpa-rs = { version = "0.6", features = ["tts"] }
+llama-cpp-2 = "0.1"
+encoding_rs = "0.8"
+rodio = "0.19"
+cpal = "0.15"
+
+# Serialization for event payload structs.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

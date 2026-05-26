@@ -1,0 +1,40 @@
+[package]
+name = "native"
+version = "0.1.0"
+description = "A Tauri App"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "native_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Shared voice engine — sibling crate in the nest. See
+# repos/nest/voice-core. Owns sherpa STT/TTS, llama summarizer,
+# Conversation, WakeWordDetector, and the EventSink trait (no Tauri).
+voice-core = { path = "../../voice-core" }
+
+tauri = { version = "2", features = ["macos-private-api", "tray-icon"] }
+tauri-plugin-opener = "2"
+tauri-plugin-global-shortcut = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sherpa-rs = { version = "0.6", features = ["tts"] }
+llama-cpp-2 = "0.1"
+encoding_rs = "0.8"
+rodio = "0.19"
+cpal = "0.15"
+# Process-memory reporting for the tray menu's "Memory: X.X GB" line.
+# Default-features off so we don't pull the full system-info graph
+# when we only need a single-process RSS read.
+sysinfo = { version = "0.32", default-features = false, features = ["system"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSWindow", "NSColor", "NSScreen", "NSGraphics", "NSRunningApplication", "NSApplication", "NSEvent", "NSWorkspace"] }
+objc2-foundation = { version = "0.3", features = ["NSValue", "NSGeometry", "NSArray", "NSString", "NSNotification", "NSOperation", "NSThread"] }
+block2 = "0.6"
