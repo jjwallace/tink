@@ -16,7 +16,7 @@ tauri-build = { version = "2", features = [] }
 # Shared voice engine — sibling crate in the nest. See
 # repos/nest/voice-core. Owns sherpa STT/TTS, llama summarizer,
 # Conversation, WakeWordDetector, and the EventSink trait (no Tauri).
-voice-core = { path = "../../voice-core" }
+voice-core = { path = "../voice-core" }
 
 tauri = { version = "2", features = ["macos-private-api", "tray-icon"] }
 tauri-plugin-opener = "2"

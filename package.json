@@ -13,7 +13,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@jjwallace/creature": "*",
+    "@jjwallace/creature": "link:@jjwallace/creature",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "d3": "^7.9.0",
