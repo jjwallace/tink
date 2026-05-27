@@ -1,4 +1,5 @@
 mod commands;
+mod creature_runtime;
 mod event_sink;
 mod file_watcher;
 mod folder_viz;
@@ -92,6 +93,14 @@ pub fn run() {
             commands::summarizer::summarizer_status,
             commands::summarizer::set_summarizer_model,
             commands::summarizer::download_summarizer_model,
+            // creature_runtime
+            creature_runtime::creature_start,
+            creature_runtime::creature_stop,
+            creature_runtime::creature_set_anchor,
+            creature_runtime::creature_set_screen,
+            creature_runtime::creature_event,
+            creature_runtime::creature_dispatch,
+            creature_runtime::creature_status,
         ])
         .setup(|app| {
             // --- Data dir & settings ---
@@ -127,6 +136,9 @@ pub fn run() {
                 summarizer_engine.set_active_model(model);
             }
             app.manage(SummarizerState(Mutex::new(summarizer_engine)));
+
+            // --- Creature runtime (choreo + orchestrator) ---
+            creature_runtime::register(app);
 
             // --- SFX directory ---
             // In dev, assets are served from public/; resolve relative to manifest dir
