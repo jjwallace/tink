@@ -721,14 +721,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "creature-core"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "crossbeam-channel"
 version = "0.5.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2532,7 +2524,6 @@ version = "0.1.0"
 dependencies = [
  "block2",
  "cpal",
- "creature-core",
  "encoding_rs",
  "llama-cpp-2",
  "objc2",

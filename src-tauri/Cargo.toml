@@ -18,11 +18,10 @@ tauri-build = { version = "2", features = [] }
 # Conversation, WakeWordDetector, and the EventSink trait (no Tauri).
 voice-core = { path = "../voice-core" }
 
-# Creature brain — private crate from the companion repo. In local
-# dev resolved via a sibling path; in CI the path is swapped for a
-# `git = "ssh://git@github.com/jjwallace/companion.git"` dep that
-# requires GitHub auth — the access gate that protects the IP.
-creature-core = { path = "../../companion/creature-core" }
+# Creature brain — links the prebuilt static lib in vendor/<target>/.
+# Source lives in the private companion repo; tink only needs the .a
+# to compile, so anyone can build tink without companion access.
+# See build.rs for the link directives.
 
 tauri = { version = "2", features = ["macos-private-api", "tray-icon"] }
 tauri-plugin-opener = "2"
