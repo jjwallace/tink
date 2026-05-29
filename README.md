@@ -1,180 +1,93 @@
-# Native
+# Tink
 
-A transparent desktop overlay app with text-to-speech, D3 folder visualization, and VFX effects. Built with Tauri 2 + SolidJS + TypeScript.
+**A voice + overlay companion for Claude Code.**
 
-Select text anywhere, hear it read aloud. Watch folder changes animate on screen. Get spoken summaries as you work.
+Tink is a transparent desktop overlay that reacts to your AI coding
+session — speaks responses aloud, visualizes activity, and acts as a
+companion at the edge of your screen.
 
-## Get Started
+[![Download for macOS](https://img.shields.io/badge/Download-macOS%20DMG-blue?style=for-the-badge&logo=apple)](https://github.com/jjwallace/tink/releases/latest)
+[![Visit Site](https://img.shields.io/badge/Site-jjwallace.github.io/tink--site-purple?style=for-the-badge)](https://jjwallace.github.io/tink-site/)
+[![Release](https://img.shields.io/github/v/release/jjwallace/tink)](https://github.com/jjwallace/tink/releases/latest)
+[![License](https://img.shields.io/github/license/jjwallace/tink)](LICENSE)
+
+---
+
+## What it does
+
+- **Speaks** responses aloud via local TTS (sherpa-onnx + Piper voices)
+- **Listens** for push-to-talk dictation via local STT (sherpa-onnx)
+- **Reacts** with a Pixi-rendered creature that responds to your AI's lifecycle
+- **Anchors** itself wherever you drop it — drag the voice anchor around your screen
+- **Summarizes** long responses with an embedded SmolLM2 model
+- Integrates with Claude Code via lifecycle hooks (`UserPromptSubmit`, `Stop`, etc.)
+
+## Install (recommended)
+
+1. Download the [latest DMG](https://github.com/jjwallace/tink/releases/latest/download/Tink.dmg)
+2. Drag **Tink** to your Applications folder
+3. First launch: grant **Accessibility** and **Microphone** permissions when prompted
+   (System Settings → Privacy & Security)
+
+That's it. The app downloads voice models on first run (~600 MB) to
+`~/Library/Application Support/com.wolfgames.native/models/`.
+
+## Build from source
 
 ```bash
-./setup.sh
-```
-
-That's it. The script checks for prerequisites (Rust, Bun, Xcode CLT), installs anything missing, pulls project dependencies, and downloads the two default voice models (~75MB each):
-
-- **VCTK** — British English
-- **Lessac** — American English (high quality)
-
-Then run the app:
-
-```bash
+git clone https://github.com/jjwallace/tink
+cd tink
+./setup.sh                  # downloads voice models, installs deps
 bun run tauri dev
 ```
 
-First build compiles Rust and takes a few minutes. After that, hot reload is fast.
+Requires: [Bun](https://bun.sh), [Rust](https://rustup.rs).
 
-### Grant Permissions
+No special access needed — the creature logic ships as a prebuilt
+static library in `src-tauri/vendor/<target>/libcreature_core.a`.
 
-On first launch, grant macOS Accessibility permissions for global hotkeys and text selection:
+## What's inside
 
-**System Settings > Privacy & Security > Accessibility > enable Native**
-
-### Try It
-
-1. Select any text on your screen
-2. Press **Page Down** (or middle-click)
-3. Hear the text read aloud with animated word highlighting
-
-<details>
-<summary>Manual setup (if you prefer)</summary>
-
-```bash
-# 1. Prerequisites
-xcode-select --install
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-curl -fsSL https://bun.sh/install | bash
-
-# 2. Dependencies
-bun install
-
-# 3. Voice models
-./setup-models.sh
-
-# 4. Run
-bun run tauri dev
-```
-
-</details>
-
-## Features
-
-### Text-to-Speech
-
-- **Offline TTS** using sherpa-onnx with Piper VITS voice models
-- **Three display modes**: Bubbles (floating sentences), Scroll (teleprompter ribbon), Paragraph (dark panel)
-- **Sentence pipelining**: first sentence plays immediately while later ones generate in background
-- **Markdown stripping**: bold, code blocks, links, headings all cleaned before speaking
-- **Escape to stop**: press Escape anywhere to cancel speech and close all UI
-
-### Voice Input (Speech-to-Text)
-
-- **Hold Page Up** to start voice input — speak and watch words fly onto the screen in real-time
-- **Release Page Up** to stop — the transcribed text is automatically pasted into the focused text field
-- Uses sherpa-onnx streaming Zipformer model (~12MB, fully offline)
-- Words animate in from random off-screen positions and assemble into a sentence at the top of the viewport
-- Waveform indicator pulses while you speak
-
-### Triggers
-
-| Trigger | Action |
-|---------|--------|
-| **Page Down** | Speak selected text (configurable hotkey) |
-| **Page Up (hold)** | Voice input — speak to type |
-| **Middle Click** | Speak selected text |
-| **Tray > Speak Selection** | Speak selected text |
-| **Selection hint** | A bubble appears near your cursor after selecting text showing the hotkey |
-
-### Folder Visualization
-
-- **D3-powered folder tree** overlaid on your screen
-- **Git status coloring**: green (new), amber (modified), red (deleted)
-- **Animated tree opening**: folders expand along the path to changed files
-- **File flash**: new files slide in with a colored glow effect
-- **Delete animation**: removed files show red strikethrough then collapse away
-- **File watcher**: polls git status every 3 seconds, auto-shows viz when files change
-- **Speech narration**: announces what changed
-
-### Dashboard Charts
-
-Four mini charts appear on the left side during active sessions:
-
-1. **Plan Progress** (donut gauge) — tracks task completion percentage
-2. **File Activity** (bar chart) — added/modified/deleted file counts
-3. **Session Timeline** (sparkline) — activity density over time
-4. **Speech Meter** (radial) — sentences spoken and word count
-
-### Auto-Speak (Claude Code Integration)
-
-When working with Claude Code, responses can be automatically summarized and spoken aloud.
-
-1. Enable **Auto-Speak (Claude)** in the tray menu
-2. Set your Anthropic API key in `~/.claude/hooks/.env` for AI summaries (optional)
-3. Configure the hook in `~/.claude/settings.json` (see docs/03-claude-hooks.md)
-
-The app runs an HTTP server on `localhost:9876`:
-- `POST /speak` — send text to be spoken
-- `POST /viz` — trigger folder visualization for a path
-- `GET /status` — check if auto-speak is enabled
-
-### VFX Overlay
-
-- **Fire particles** — cursor-following fire effect
-- **Bubble pops** — random or shift-triggered bubble animations
-- **Bubble trail** — hold Shift to leave a trail of bubbles
-- **Tweakpane** — live parameter tuning for all effects
-
-## Tray Menu
-
-| Item | Description |
-|------|-------------|
-| **Speak Selection** | Read selected text aloud |
-| **Auto-Speak (Claude)** | Toggle automatic speech for Claude Code responses |
-| **Settings > Voice** | Lessac (American) or VCTK (British) |
-| **Settings > Shortcut** | Page Down, Cmd+Shift+R, F5, etc. |
-| **Settings > Display** | Bubbles, Scroll, or Paragraph mode |
-| **Toggle Fire / Bubbles** | VFX controls |
-| **Tweak Controls** | Open parameter panel |
-| **Show Folder Tree** | Visualize current directory |
-| **Quit** | Exit the app |
+| Folder | What it is |
+|---|---|
+| [`src/`](src/) | SolidJS frontend — overlay UI, settings panel, dashboards |
+| [`src-tauri/`](src-tauri/) | Rust backend — TTS, STT, summarizer, hooks integration |
+| [`voice-core/`](voice-core/) | Shared Rust crate — STT/TTS engines + EventSink |
+| [`src-tauri/vendor/`](src-tauri/vendor/) | Prebuilt `libcreature_core.a` per target |
+| [`docs/`](docs/) | Architecture and design notes |
 
 ## Architecture
 
-| Rust Module | Purpose |
-|-------------|---------|
-| `lib.rs` | App setup, tray, commands, CGEvent tap, shortcuts |
-| `tts.rs` | TTS engine, voices, sentence splitting, markdown strip |
-| `settings.rs` | Persisted settings (voice, shortcut, display, auto-speak) |
-| `speak_server.rs` | HTTP server on :9876 |
-| `file_watcher.rs` | Git status polling, change detection |
-| `folder_viz.rs` | Directory scanner with git status |
-
-| Frontend | Purpose |
-|----------|---------|
-| `paragraph-reader.ts` | All 3 TTS display modes |
-| `folder-viz.ts` | D3 animated folder tree |
-| `chart-column.ts` | Dashboard mini charts |
-| `selection-hint.ts` | Hotkey hint bubble |
-| `word-scroller.ts` | Original arched scroller (preserved) |
-
-## Build for Distribution
-
-```bash
-bun run tauri build
+```
+┌─────────────────────────────────────────────────┐
+│ Tauri Window (transparent, fullscreen overlay)  │
+│                                                 │
+│  ┌──────────────┐  ┌─────────────────────────┐  │
+│  │ SolidJS UI   │  │ Pixi + Canvas 2D layers │  │
+│  │ - Settings   │  │ - Creature              │  │
+│  │ - Speech UI  │  │ - Sine waves            │  │
+│  │ - Voice Anchr│  │ - Particles, VFX        │  │
+│  └──────────────┘  └─────────────────────────┘  │
+│                                                 │
+│  ┌─────────────────────────────────────────┐    │
+│  │ Rust Backend                            │    │
+│  │ - TTS (sherpa-rs/VITS)                  │    │
+│  │ - STT (sherpa-rs/Zipformer)             │    │
+│  │ - Summarizer (llama-cpp-2/SmolLM2)      │    │
+│  │ - Creature runtime (linked from .a)     │    │
+│  │ - macOS event tap (global hotkeys)      │    │
+│  └─────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────┘
 ```
 
-Produces a `.dmg` / `.app` in `src-tauri/target/release/bundle/`.
+## Hooks
 
-## Settings
+Tink integrates with Claude Code via shell hooks at `~/.claude/hooks/`.
+The narrator hook converts assistant responses → TTS; the start-sound
+hook fires on prompt submit. See [docs/](docs/) for the full hook map.
 
-Stored at `~/Library/Application Support/com.wolfgames.native/settings.json`:
+## License
 
-```json
-{
-  "shortcut": "PageDown",
-  "voice": "lessac-fast",
-  "display": "bubbles",
-  "auto_speak": false
-}
-```
-
-Voice models stored in the same directory under `models/`.
+MIT for the source in this repo. The `@jjwallace/creature` npm
+package and the `libcreature_core.a` static library consumed at build
+time are proprietary and distributed as built artifacts only.
