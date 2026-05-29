@@ -1,6 +1,10 @@
 <div align="center">
 
 <a href="https://jjwallace.github.io/tink-site/">
+  <img src="assets/site-footer.png" alt="T.I.N.K. — Thought Interactive Neural Kernel" width="800" />
+</a>
+
+<a href="https://jjwallace.github.io/tink-site/">
   <img src="assets/site-hero.png" alt="T.I.N.K. — Object Recovered. Origin Unknown." width="800" />
 </a>
 
@@ -8,12 +12,10 @@
   <img src="assets/site-disclosure.png" alt="For decades they denied it. Congress is still asking questions. It fell from the sky. T.I.N.K. is on your desktop." width="800" />
 </a>
 
-<a href="https://jjwallace.github.io/tink-site/">
-  <img src="assets/site-briefing.png" alt="Field Manual / Extract / Unclassified — the dossier" width="800" />
-</a>
+<img src="assets/tink-crashed.png" alt="Tink — crashed" width="800" />
 
 <a href="https://jjwallace.github.io/tink-site/">
-  <img src="assets/site-footer.png" alt="T.I.N.K. — Thought Interactive Neural Kernel" width="800" />
+  <img src="assets/site-briefing.png" alt="Field Manual / Extract / Unclassified — the dossier" width="800" />
 </a>
 
 # Tink
@@ -103,6 +105,14 @@ hook fires on prompt submit. See [docs/](docs/) for the full hook map.
 
 ## License
 
-MIT for the source in this repo. The `@jjwallace/creature` npm
-package and the `libcreature_core.a` static library consumed at build
-time are proprietary and distributed as built artifacts only.
+**MIT** for the source in this repo. Fork, hack, ship.
+
+If you'd like to work on the creature itself — choreography, rendering,
+the Rust core — message [**jjwallace**](https://github.com/jjwallace)
+about joining the core team.
+
+---
+
+<sub>The `@jjwallace/creature` npm package and the `libcreature_core.a`
+static library that ship in this repo are proprietary and distributed
+as built artifacts only.</sub>
