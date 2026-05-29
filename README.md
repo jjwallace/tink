@@ -1,36 +1,16 @@
 <div align="center">
 
-<img src="assets/tink-zoomed-polished.png" alt="Tink" width="320" />
+<a href="https://jjwallace.github.io/tink-site/">
+  <img src="assets/site-preview.png" alt="Tink — visit the site" width="640" />
+</a>
 
 # Tink
 
 ### A voice + overlay companion for Claude Code.
 
-Transparent desktop overlay. Reacts to your AI coding session — speaks responses aloud,
-visualizes activity, and acts as a companion at the edge of your screen.
-
-<br/>
-
 [![Download for macOS](https://img.shields.io/badge/Download-macOS%20DMG-blue?style=for-the-badge&logo=apple)](https://github.com/jjwallace/tink/releases/latest)
-[![Visit Site](https://img.shields.io/badge/Site-jjwallace.github.io%2Ftink--site-purple?style=for-the-badge)](https://jjwallace.github.io/tink-site/)
+[![Visit Site](https://img.shields.io/badge/Site-tink--site-purple?style=for-the-badge)](https://jjwallace.github.io/tink-site/)
 [![Release](https://img.shields.io/github/v/release/jjwallace/tink?style=for-the-badge)](https://github.com/jjwallace/tink/releases/latest)
-
-<br/>
-
-<table>
-  <tr>
-    <td align="center"><img src="assets/tink-plain.png" width="220" alt="Idle" /><br/><sub><b>Idle</b></sub></td>
-    <td align="center"><img src="assets/tink-zoomed.png" width="220" alt="Focused" /><br/><sub><b>Focused</b></sub></td>
-    <td align="center"><img src="assets/tink-falling.png" width="220" alt="Reactive" /><br/><sub><b>Reactive</b></sub></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="assets/tink-concept-too-shiney.png" width="220" alt="Concept" /><br/><sub><b>Concept</b></sub></td>
-    <td align="center"><img src="assets/tink-crashed.png" width="220" alt="On error" /><br/><sub><b>On error</b></sub></td>
-    <td align="center"><img src="assets/tink-concept-steal-bras.png" width="220" alt="Off-task" /><br/><sub><b>Off-task</b></sub></td>
-  </tr>
-</table>
-
-<br/>
 
 </div>
 
