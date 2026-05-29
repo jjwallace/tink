@@ -113,6 +113,7 @@ about joining the core team.
 
 ---
 
-<sub>The `@jjwallace/creature` npm package and the `libcreature_core.a`
-static library that ship in this repo are proprietary and distributed
-as built artifacts only.</sub>
+<sub>The `libcreature_core.a` static library committed in this repo
+contains the proprietary choreography brain — state machine, blend
+curves, the things that make Tink *feel* like Tink — and ships as
+machine code only.</sub>
