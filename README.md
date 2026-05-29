@@ -6,11 +6,11 @@
   <img src="assets/site-hero.png" alt="T.I.N.K. — Object Recovered. Origin Unknown." width="900" />
 </a>
 
+<img src="assets/tink-falling.png" alt="Tink — falling" width="900" />
+
 <a href="https://jjwallace.github.io/tink-site/">
   <img src="assets/site-disclosure.png" alt="For decades they denied it. Congress is still asking questions. It fell from the sky. T.I.N.K. is on your desktop." width="900" />
 </a>
-
-<img src="assets/tink-falling.png" alt="Tink — falling" width="900" />
 
 <img src="assets/tink-crashed.png" alt="Tink — crashed" width="900" />
 
