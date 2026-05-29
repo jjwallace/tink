@@ -1,7 +1,19 @@
 <div align="center">
 
 <a href="https://jjwallace.github.io/tink-site/">
-  <img src="assets/site-preview.png" alt="Tink — visit the site" width="640" />
+  <img src="assets/site-hero.png" alt="T.I.N.K. — Object Recovered. Origin Unknown." width="800" />
+</a>
+
+<a href="https://jjwallace.github.io/tink-site/">
+  <img src="assets/site-disclosure.png" alt="For decades they denied it. Congress is still asking questions. It fell from the sky. T.I.N.K. is on your desktop." width="800" />
+</a>
+
+<a href="https://jjwallace.github.io/tink-site/">
+  <img src="assets/site-briefing.png" alt="Field Manual / Extract / Unclassified — the dossier" width="800" />
+</a>
+
+<a href="https://jjwallace.github.io/tink-site/">
+  <img src="assets/site-footer.png" alt="T.I.N.K. — Thought Interactive Neural Kernel" width="800" />
 </a>
 
 # Tink
