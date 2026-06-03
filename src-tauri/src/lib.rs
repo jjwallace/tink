@@ -1,3 +1,4 @@
+#![recursion_limit = "256"]
 mod commands;
 mod creature_runtime;
 mod event_sink;
@@ -273,6 +274,13 @@ pub fn run() {
                             let _ = engine2.download_model("en_GB-alba-medium");
                         }
                         drop(engine2);
+                        let stt2 = handle.state::<SttState>();
+                        let stt_engine2 = stt2.0.lock().expect("stt lock");
+                        if !stt_engine2.is_active_ready() {
+                            eprintln!("[setup] auto-downloading STT model");
+                            let _ = stt_engine2.download_model(stt_engine2.active_model());
+                        }
+                        drop(stt_engine2);
                     }
                 });
             }

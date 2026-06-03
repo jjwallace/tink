@@ -59,6 +59,8 @@ export interface AllSettings {
   // "en_US-ryan-high") for newly registered voices and short legacy IDs
   // ("ryan") for ones still using the old key. The picker renders from
   // tts_voices instead and indexes into this for the badge.
+  tts_volume: number;
+  sfx_volume: number;
   tts_models: Record<string, boolean>;
   // Full list of registered voice specs (built-ins + user-added).
   tts_voices: VoiceSpec[];

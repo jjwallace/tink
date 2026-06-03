@@ -1,4 +1,4 @@
-import { Howl } from "howler";
+import { Howl, Howler } from "howler";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -147,6 +147,17 @@ export function preload() {
 
 export async function initSoundEvents(): Promise<UnlistenFn[]> {
   const unlisteners: UnlistenFn[] = [];
+
+  // Apply saved SFX volume on init, then track live changes.
+  try {
+    const s = await invoke<{ sfx_volume?: number }>("get_all_settings");
+    Howler.volume(s.sfx_volume ?? 0.7);
+  } catch { /* ignore */ }
+  unlisteners.push(
+    await listen<number>("sfx-volume-changed", (e) => {
+      Howler.volume(e.payload);
+    })
+  );
 
   // Start sound — plays once when Claude begins a turn
   unlisteners.push(
