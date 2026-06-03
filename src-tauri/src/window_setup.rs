@@ -83,26 +83,75 @@ pub fn start_anchor_proximity_poll(handle: tauri::AppHandle) {
             };
 
             let Some(window) = handle.get_webview_window("main") else { continue };
-            let pos = match window.inner_position() {
-                Ok(p) => p,
-                Err(_) => continue,
+
+            // In dev mode Tauri's inner_size() may return the config size
+            // (800×600) even after configure_main_window has resized the
+            // NSWindow to fullscreen — the Tauri API caches until a proper
+            // Cocoa resize event fires. Read the NSWindow frame directly so
+            // dev and release behave identically.
+            #[cfg(target_os = "macos")]
+            let (screen_w, screen_h) = {
+                use objc2_app_kit::NSWindow;
+                if let Ok(ptr) = window.ns_window() {
+                    unsafe {
+                        let ns: &NSWindow = &*(ptr as *const NSWindow);
+                        let f = ns.frame();
+                        (f.size.width, f.size.height)
+                    }
+                } else {
+                    let s = window.inner_size().unwrap_or_default();
+                    let sc = window.scale_factor().unwrap_or(1.0);
+                    (s.width as f64 / sc, s.height as f64 / sc)
+                }
             };
-            let size = match window.inner_size() {
-                Ok(s) => s,
-                Err(_) => continue,
+
+            #[cfg(not(target_os = "macos"))]
+            let (screen_w, screen_h) = {
+                let s = window.inner_size().unwrap_or_default();
+                let sc = window.scale_factor().unwrap_or(1.0);
+                (s.width as f64 / sc, s.height as f64 / sc)
             };
-            // current_mouse_pos returns CG points; inner_position/size
-            // return physical pixels. On Retina (2x), forgetting the
-            // scale-factor divide puts the computed anchor center off
-            // by 2x — the cursor can never land within HOVER_RADIUS
-            // and the overlay stays click-through, so the anchor never
-            // becomes draggable in the compiled build. Match the unit
-            // before comparing.
-            let scale = window.scale_factor().unwrap_or(1.0);
+
+            // NSWindow.frame origin in Cocoa coords (bottom-left origin, y up).
+            // current_mouse_pos() uses CGEvent which also has top-left origin
+            // (y down), so we get the screen height to flip the y of the origin.
+            #[cfg(target_os = "macos")]
+            let win_origin = {
+                use objc2_app_kit::{NSScreen, NSWindow};
+                use objc2::MainThreadMarker;
+                if let Ok(ptr) = window.ns_window() {
+                    unsafe {
+                        let ns: &NSWindow = &*(ptr as *const NSWindow);
+                        let f = ns.frame();
+                        // Primary screen height for Cocoa→CG coord flip.
+                        let primary_h = if let Some(mtm) = MainThreadMarker::new() {
+                            NSScreen::screens(mtm)
+                                .iter()
+                                .next()
+                                .map(|s| s.frame().size.height)
+                                .unwrap_or(screen_h)
+                        } else { screen_h };
+                        // CG y = primary_h - (cocoa_y + window_h)
+                        let cg_y = primary_h - (f.origin.y + f.size.height);
+                        (f.origin.x, cg_y)
+                    }
+                } else {
+                    let p = window.inner_position().unwrap_or_default();
+                    let sc = window.scale_factor().unwrap_or(1.0);
+                    (p.x as f64 / sc, p.y as f64 / sc)
+                }
+            };
+
+            #[cfg(not(target_os = "macos"))]
+            let win_origin = {
+                let p = window.inner_position().unwrap_or_default();
+                let sc = window.scale_factor().unwrap_or(1.0);
+                (p.x as f64 / sc, p.y as f64 / sc)
+            };
 
             let (mx, my) = current_mouse_pos();
-            let anchor_x = (pos.x as f64 + fx * size.width as f64) / scale;
-            let anchor_y = (pos.y as f64 + fy * size.height as f64) / scale;
+            let anchor_x = win_origin.0 + fx * screen_w;
+            let anchor_y = win_origin.1 + fy * screen_h;
             let dx = mx - anchor_x;
             let dy = my - anchor_y;
             let near = (dx * dx + dy * dy) < HOVER_RADIUS * HOVER_RADIUS;
