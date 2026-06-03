@@ -39,15 +39,19 @@
 - **Summarizes** long responses with an embedded SmolLM2 model
 - Integrates with Claude Code via lifecycle hooks (`UserPromptSubmit`, `Stop`, etc.)
 
-## Install (recommended)
+## Install
 
-1. Download the [latest DMG](https://github.com/jjwallace/tink/releases/latest/download/Tink.dmg)
-2. Drag **Tink** to your Applications folder
-3. First launch: grant **Accessibility** and **Microphone** permissions when prompted
-   (System Settings → Privacy & Security)
+1. **[Download the latest DMG](https://github.com/jjwallace/tink/releases/latest)**
+2. Open the DMG → drag **Tink** into Applications
+3. Strip the quarantine flag (required for unsigned apps):
+   ```bash
+   xattr -cr /Applications/Tink.app
+   ```
+4. Launch Tink — it automatically opens **System Settings → Privacy & Security → Accessibility**
+5. Add Tink to the Accessibility list and toggle it **on**
+6. Voice + STT + summarizer models download automatically on first launch (~200 MB total)
 
-That's it. The app downloads voice models on first run (~600 MB) to
-`~/Library/Application Support/com.wolfgames.native/models/`.
+> **Microphone permission:** macOS will prompt the first time you press the push-to-talk key.
 
 ## Build from source
 

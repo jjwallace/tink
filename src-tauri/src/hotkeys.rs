@@ -656,6 +656,7 @@ pub fn install_event_tap(app_handle: tauri::AppHandle) {
 
         // Retry loop: if Accessibility isn't granted yet, wait and retry.
         // This handles the case where the user approves while the app is open.
+        let mut notified = false;
         let tap = loop {
             let t = CGEventTapCreate(
                 K_CG_HID_EVENT_TAP,
@@ -667,6 +668,14 @@ pub fn install_event_tap(app_handle: tauri::AppHandle) {
             );
             if !t.is_null() {
                 break t;
+            }
+            if !notified {
+                notified = true;
+                if let Ok(guard) = GLOBAL_APP_HANDLE.lock() {
+                    if let Some(handle) = guard.as_ref() {
+                        let _ = handle.emit("accessibility-needed", ());
+                    }
+                }
             }
             eprintln!("[hotkeys] event tap unavailable — waiting for Accessibility permission");
             std::thread::sleep(std::time::Duration::from_secs(3));

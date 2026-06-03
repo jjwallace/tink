@@ -12,6 +12,7 @@ import { PixelStream } from "./features/ambient-vfx/pixel-stream";
 import { SineWaves } from "./features/speech/sine-waves";
 import { AudioTentacles } from "./features/audio-tentacles";
 import { preload as preloadSounds, initSoundEvents, playSfx, startLoopSfx, stopLoopSfx, setMuted } from "./sounds";
+import { initToasts } from "./features/toast";
 import {
   Creature,
   CreatureOrchestrator,
@@ -235,6 +236,10 @@ function App() {
     preloadSounds();
     const soundUns = await initSoundEvents();
     unlisteners.push(...soundUns);
+
+    // Toast notifications (accessibility prompt, model downloads)
+    const cleanupToasts = await initToasts();
+    unlisteners.push(cleanupToasts);
 
     unlisteners.push(await listen("toggle-bubbles", toggleBubbles));
 

@@ -281,6 +281,13 @@ pub fn run() {
                             let _ = stt_engine2.download_model(stt_engine2.active_model());
                         }
                         drop(stt_engine2);
+                        let sum2 = handle.state::<SummarizerState>();
+                        let sum_engine2 = sum2.0.lock().expect("summarizer lock");
+                        if !sum_engine2.is_active_ready() {
+                            eprintln!("[setup] auto-downloading summarizer model");
+                            let _ = sum_engine2.download_model(sum_engine2.active_model());
+                        }
+                        drop(sum_engine2);
                     }
                 });
             }
