@@ -63,9 +63,10 @@ pub fn start_anchor_proximity_poll(handle: tauri::AppHandle) {
     use crate::state::AppSettings;
 
     std::thread::spawn(move || {
-        // Matches the DOM anchor's SIZE/2 — tight so hover only fires
-        // when the mouse is actually on the visible button, not near it.
-        const HOVER_RADIUS: f64 = 48.0;
+        // SIZE/2 = 85 px logical — covers the full hit zone of the
+        // anchor root div so the window stays interactive anywhere
+        // inside the tap target, not just on the visible orb.
+        const HOVER_RADIUS: f64 = 85.0;
         loop {
             std::thread::sleep(std::time::Duration::from_millis(60));
 
@@ -108,7 +109,11 @@ pub fn start_anchor_proximity_poll(handle: tauri::AppHandle) {
 
             let ctl = handle.state::<std::sync::Arc<CursorCtl>>();
             let prev = ctl.anchor_hover.load(Ordering::Relaxed);
-            if near != prev {
+            // Don't flip to non-hover while a drag is active — the
+            // saved anchor position lags the live orb position so the
+            // poll would otherwise kill interactivity mid-drag.
+            let dragging = ctl.anchor_dragging.load(Ordering::Relaxed);
+            if near != prev && !(prev && !near && dragging) {
                 ctl.anchor_hover.store(near, Ordering::Relaxed);
                 apply_cursor_state(&handle);
             }

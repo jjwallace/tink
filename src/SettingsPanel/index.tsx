@@ -503,6 +503,8 @@ export default function SettingsPanel() {
             "background-image": "var(--panel-bg-image), var(--panel-bg)",
             padding: "16px 20px",
             "overflow-y": "auto",
+            "scrollbar-width": "thin",
+            "scrollbar-color": "var(--control-border) transparent",
             "border-left": "1px solid var(--panel-border)",
             "box-shadow":
               "-20px 0 40px rgba(0,0,0,0.4), inset 1px 0 0 var(--edge-highlight)",
@@ -673,36 +675,6 @@ export default function SettingsPanel() {
                   />
                 )}
               </For>
-              <AddVoiceRow
-                open={addVoiceOpen()}
-                voiceId={addVoiceId()}
-                error={addVoiceErr()}
-                onToggle={() => {
-                  setAddVoiceOpen(!addVoiceOpen());
-                  setAddVoiceErr(null);
-                }}
-                onChangeId={(v) => {
-                  setAddVoiceId(v);
-                  setAddVoiceErr(null);
-                }}
-                onAdd={async () => {
-                  const id = addVoiceId().trim();
-                  if (!id) {
-                    setAddVoiceErr("Enter a Piper voice ID");
-                    return;
-                  }
-                  try {
-                    await invoke("add_custom_voice", { piperId: id });
-                    setAddVoiceId("");
-                    setAddVoiceOpen(false);
-                    fetchSettings();
-                    // Auto-trigger the download for the freshly added voice.
-                    downloadVoiceModel(id);
-                  } catch (err) {
-                    setAddVoiceErr(String(err));
-                  }
-                }}
-              />
             </div>
           </SectionBox>
 

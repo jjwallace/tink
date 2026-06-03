@@ -245,8 +245,7 @@ pub fn run() {
                     let mut missing = Vec::new();
                     let tts = handle.state::<TtsState>();
                     let engine = tts.0.lock().expect("tts lock");
-                    if !engine.is_model_downloaded("en_US-lessac-low") { missing.push("Lessac (American)"); }
-                    if !engine.is_model_downloaded("en_GB-vctk-medium") { missing.push("VCTK (British)"); }
+                    if !engine.is_model_downloaded("en_GB-alba-medium") { missing.push("Alba (Scottish)"); }
                     drop(engine);
                     let stt = handle.state::<SttState>();
                     let stt_engine = stt.0.lock().expect("stt lock");
@@ -260,10 +259,20 @@ pub fn run() {
                     drop(sum_engine);
 
                     if !missing.is_empty() {
-                        eprintln!("Missing models: {:?}", missing);
+                        eprintln!("Missing models: {:?} — auto-downloading", missing);
                         let _ = handle.emit("models-missing", serde_json::json!({
                             "missing": missing,
                         }));
+                        // Auto-download on first launch so TTS works
+                        // immediately without requiring the user to open
+                        // settings and click Download.
+                        let tts2 = handle.state::<TtsState>();
+                        let engine2 = tts2.0.lock().expect("tts lock");
+                        if !engine2.is_model_downloaded("en_GB-alba-medium") {
+                            eprintln!("[setup] auto-downloading Alba voice model");
+                            let _ = engine2.download_model("en_GB-alba-medium");
+                        }
+                        drop(engine2);
                     }
                 });
             }

@@ -72,7 +72,7 @@ pub fn download_all_models(app: tauri::AppHandle) -> Result<(), String> {
     std::thread::spawn(move || {
         let tts = handle.state::<TtsState>();
         let engine = tts.0.lock().expect("tts lock");
-        let baseline = ["en_US-lessac-low", "en_US-lessac-high", "en_GB-vctk-medium"];
+        let baseline = ["en_GB-alba-medium"];
         for id in baseline {
             let label = engine
                 .spec(id)

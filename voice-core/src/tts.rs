@@ -167,16 +167,8 @@ fn humanize_piper_id(id: &str) -> String {
 /// built-ins; adding to this list is fine but not required — users can
 /// add any Piper voice through the UI's "+ Add voice" flow.
 pub fn default_voice_specs() -> Vec<VoiceSpec> {
-    // Older code used short IDs like "lessac-fast" / "lessac" / "vctk" /
-    // "alba"; settings on disk may still hold those. To keep them working
-    // without a migration we don't change the canonical IDs here —
-    // legacy_id_to_piper handles the mapping in TtsEngine::set_voice.
     vec![
-        spec_with_label("en_GB-vctk-medium", "VCTK (British)", Some(92)),
-        spec_with_label("en_US-lessac-high", "Lessac (High Quality)", Some(127)),
-        spec_with_label("en_US-lessac-low", "Lessac (Fast)", Some(78)),
         spec_with_label("en_GB-alba-medium", "Alba (Scottish female)", Some(80)),
-        spec_with_label("en_US-ryan-high", "Ryan (US male, bright)", Some(110)),
     ]
 }
 
