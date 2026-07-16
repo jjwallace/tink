@@ -18,20 +18,13 @@ function codeToKeyName(code: string): string | null {
   return null;
 }
 
-// Keys that appear in normal typing — must have a modifier.
-const NEEDS_MODIFIER = new Set([
-  "Backquote", "Minus", "Equal",
-  "BracketLeft", "BracketRight", "Backslash",
-  "Semicolon", "Quote", "Comma", "Period", "Slash",
-  "Tab", "Space", "Enter", "Backspace",
-]);
-
 /// True if the key + modifier combination is acceptable as a hotkey.
-/// Letters/digits and punctuation need a modifier; nav/arrow/F-keys are
-/// usable bare since they don't appear in normal text entry.
+/// Bare letters/digits are rejected (would fire on every keystroke);
+/// they must be accompanied by at least one modifier. Bare nav and
+/// function keys are fine since they don't appear in typing.
 function isAcceptable(key: string, hasModifier: boolean): boolean {
   const isLetterOrDigit = key.length === 1 && /^[A-Z0-9]$/.test(key);
-  if (isLetterOrDigit || NEEDS_MODIFIER.has(key)) return hasModifier;
+  if (isLetterOrDigit) return hasModifier;
   return SUPPORTED_HOTKEYS.has(key);
 }
 
@@ -123,7 +116,9 @@ export function HotkeyCaptureRow(props: {
       }
       const key = codeToKeyName(e.code);
       if (!key) {
-        setError(`${e.code} isn't supported`);
+        setError(
+          `${e.code} isn't supported — try a letter/digit with a modifier (Cmd+Shift+A), F1–F20, or PageUp/Down/Home/End/Insert/Delete`,
+        );
         return;
       }
       const mods = {
@@ -134,7 +129,9 @@ export function HotkeyCaptureRow(props: {
       };
       const hasModifier = mods.cmd || mods.ctrl || mods.alt || mods.shift;
       if (!isAcceptable(key, hasModifier)) {
-        setError(`${key} needs a modifier (Cmd / Ctrl / Alt / Shift)`);
+        setError(
+          `${key} needs at least one modifier (Cmd / Ctrl / Alt / Shift)`,
+        );
         return;
       }
       props.onChange(formatShortcut(key, mods));
@@ -151,7 +148,7 @@ export function HotkeyCaptureRow(props: {
       label={props.label ?? "Hotkey"}
       hint={
         props.hint ??
-        "Global push-to-talk key. Click the chiclet, then press any key. F-keys, arrow keys, PageUp/Down, Home/End work bare. Letters, digits, and punctuation need a modifier (e.g. Cmd+Shift+A)."
+        "Global key to hold for push-to-talk voice capture. Click the chiclet, then press your chosen key (or chord — e.g. Cmd+Shift+A). Supported: F1–F20, PageUp/Down, Home/End, Insert/Delete, or any letter/digit with a modifier."
       }
     >
       <div style={{ display: "flex", "align-items": "center", gap: "6px" }}>

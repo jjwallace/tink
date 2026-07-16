@@ -29,15 +29,6 @@
 use tauri::{Emitter, Manager};
 use voice_core::tts;
 
-/// Read the current TTS volume from settings (0.0–1.0). Defaults to 0.8
-/// if the lock can't be acquired (shouldn't happen; defensive fallback).
-fn tts_volume(handle: &tauri::AppHandle) -> f32 {
-    handle
-        .try_state::<AppSettings>()
-        .and_then(|s| s.settings.try_lock().ok().map(|g| g.tts_volume))
-        .unwrap_or(0.8)
-}
-
 use crate::state::{
     AppSettings, SummarizerState, TtsState, PAUSED, SPEAK_SEL_SUMMARIZE, USER_SPEAKING,
 };
@@ -274,7 +265,6 @@ pub fn do_speak_selection(handle: tauri::AppHandle, summarize: bool) {
                             let source = rodio::buffer::SamplesBuffer::new(
                                 1, sample_rate, (*samples_arc).clone(),
                             );
-                            sink.set_volume(tts_volume(&handle));
                             sink.append(source);
                             tts::spawn_amplitude_emitter(
                                 std::sync::Arc::new(TauriSink(handle.clone())),
@@ -408,7 +398,6 @@ pub fn do_speak_text(handle: tauri::AppHandle, raw_text: String) {
                         let source = rodio::buffer::SamplesBuffer::new(
                             1, sample_rate, (*samples_arc).clone(),
                         );
-                        sink.set_volume(tts_volume(&handle));
                         sink.append(source);
                         tts::spawn_amplitude_emitter(
                             std::sync::Arc::new(TauriSink(handle.clone())),
@@ -501,7 +490,6 @@ pub fn speak_brief(text: String, handle: tauri::AppHandle) {
                             let source = rodio::buffer::SamplesBuffer::new(
                                 1, sample_rate, samples,
                             );
-                            sink.set_volume(tts_volume(&handle));
                             sink.append(source);
                             if let Ok(mut s) = sink_holder.lock() {
                                 *s = Some(sink);

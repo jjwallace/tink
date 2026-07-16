@@ -124,7 +124,7 @@ pub fn build(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     TrayIconBuilder::with_id("main")
         .icon(icon)
-        .tooltip("Tink")
+        .tooltip("Native")
         .menu(&menu)
         .show_menu_on_left_click(true)
         .on_tray_icon_event(|tray, _event| {
@@ -181,59 +181,50 @@ pub fn handle_menu_event(app: &tauri::AppHandle, event: tauri::menu::MenuEvent) 
 /// through NSWindow because the window setup at startup uses
 /// setFrame_display to cover the menu bar — Tauri's set_position /
 /// set_size get clobbered by the NSWindow frame.
-///
-/// Menu event handlers run on a background thread in Tauri 2, so
-/// NSWindow operations (which require the main thread) are dispatched
-/// via `run_on_main_thread`.
 fn switch_to_next_screen(app: &tauri::AppHandle) {
     #[cfg(target_os = "macos")]
     {
-        let app_clone = app.clone();
-        if let Err(e) = app.run_on_main_thread(move || {
-            use objc2::MainThreadMarker;
-            use objc2_app_kit::{NSScreen, NSWindow};
+        use objc2::MainThreadMarker;
+        use objc2_app_kit::{NSScreen, NSWindow};
 
-            let Some(win) = app_clone.get_webview_window("main") else { return };
-            let Some(mtm) = MainThreadMarker::new() else {
-                eprintln!("[tray] switch-screen: not on main thread after dispatch");
-                return;
-            };
-            let screens = NSScreen::screens(mtm);
-            if screens.len() < 2 {
-                eprintln!("[tray] only one screen; switch-screen no-op");
-                return;
-            }
-            let ns_win_ptr = match win.ns_window() {
-                Ok(p) => p,
-                Err(_) => return,
-            };
-            unsafe {
-                let ns_window: &NSWindow = &*(ns_win_ptr as *const NSWindow);
-                let current = ns_window.screen();
-                let mut idx = 0usize;
-                if let Some(cur) = current.as_ref() {
-                    let cur_frame = cur.frame();
-                    for (i, s) in screens.iter().enumerate() {
-                        let f = s.frame();
-                        if f.origin.x == cur_frame.origin.x
-                            && f.origin.y == cur_frame.origin.y
-                        {
-                            idx = i;
-                            break;
-                        }
+        let Some(win) = app.get_webview_window("main") else { return };
+        let Some(mtm) = MainThreadMarker::new() else {
+            eprintln!("[tray] switch-screen must run on main thread");
+            return;
+        };
+        let screens = NSScreen::screens(mtm);
+        if screens.len() < 2 {
+            eprintln!("[tray] only one screen; switch-screen no-op");
+            return;
+        }
+        let ns_win_ptr = match win.ns_window() {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+        unsafe {
+            let ns_window: &NSWindow = &*(ns_win_ptr as *const NSWindow);
+            let current = ns_window.screen();
+            let mut idx = 0usize;
+            if let Some(cur) = current.as_ref() {
+                let cur_frame = cur.frame();
+                for (i, s) in screens.iter().enumerate() {
+                    let f = s.frame();
+                    if f.origin.x == cur_frame.origin.x
+                        && f.origin.y == cur_frame.origin.y
+                    {
+                        idx = i;
+                        break;
                     }
                 }
-                let next_idx = (idx + 1) % screens.len();
-                let next = screens.objectAtIndex(next_idx);
-                let frame = next.frame();
-                ns_window.setFrame_display(frame, true);
-                eprintln!(
-                    "[tray] switched to screen {} ({}x{} at {},{})",
-                    next_idx, frame.size.width, frame.size.height, frame.origin.x, frame.origin.y,
-                );
             }
-        }) {
-            eprintln!("[tray] switch-screen dispatch failed: {e:?}");
+            let next_idx = (idx + 1) % screens.len();
+            let next = screens.objectAtIndex(next_idx);
+            let frame = next.frame();
+            ns_window.setFrame_display(frame, true);
+            eprintln!(
+                "[tray] switched to screen {} ({}x{} at {},{})",
+                next_idx, frame.size.width, frame.size.height, frame.origin.x, frame.origin.y,
+            );
         }
     }
 

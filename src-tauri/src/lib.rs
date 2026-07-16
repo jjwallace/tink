@@ -1,6 +1,4 @@
-#![recursion_limit = "256"]
 mod commands;
-mod creature_runtime;
 mod event_sink;
 mod file_watcher;
 mod folder_viz;
@@ -94,14 +92,6 @@ pub fn run() {
             commands::summarizer::summarizer_status,
             commands::summarizer::set_summarizer_model,
             commands::summarizer::download_summarizer_model,
-            // creature_runtime
-            creature_runtime::creature_start,
-            creature_runtime::creature_stop,
-            creature_runtime::creature_set_anchor,
-            creature_runtime::creature_set_screen,
-            creature_runtime::creature_event,
-            creature_runtime::creature_dispatch,
-            creature_runtime::creature_status,
         ])
         .setup(|app| {
             // --- Data dir & settings ---
@@ -137,9 +127,6 @@ pub fn run() {
                 summarizer_engine.set_active_model(model);
             }
             app.manage(SummarizerState(Mutex::new(summarizer_engine)));
-
-            // --- Creature runtime (choreo + orchestrator) ---
-            creature_runtime::register(app);
 
             // --- SFX directory ---
             // In dev, assets are served from public/; resolve relative to manifest dir
@@ -246,7 +233,8 @@ pub fn run() {
                     let mut missing = Vec::new();
                     let tts = handle.state::<TtsState>();
                     let engine = tts.0.lock().expect("tts lock");
-                    if !engine.is_model_downloaded("en_GB-alba-medium") { missing.push("Alba (Scottish)"); }
+                    if !engine.is_model_downloaded("en_US-lessac-low") { missing.push("Lessac (American)"); }
+                    if !engine.is_model_downloaded("en_GB-vctk-medium") { missing.push("VCTK (British)"); }
                     drop(engine);
                     let stt = handle.state::<SttState>();
                     let stt_engine = stt.0.lock().expect("stt lock");
@@ -260,34 +248,10 @@ pub fn run() {
                     drop(sum_engine);
 
                     if !missing.is_empty() {
-                        eprintln!("Missing models: {:?} — auto-downloading", missing);
+                        eprintln!("Missing models: {:?}", missing);
                         let _ = handle.emit("models-missing", serde_json::json!({
                             "missing": missing,
                         }));
-                        // Auto-download on first launch so TTS works
-                        // immediately without requiring the user to open
-                        // settings and click Download.
-                        let tts2 = handle.state::<TtsState>();
-                        let engine2 = tts2.0.lock().expect("tts lock");
-                        if !engine2.is_model_downloaded("en_GB-alba-medium") {
-                            eprintln!("[setup] auto-downloading Alba voice model");
-                            let _ = engine2.download_model("en_GB-alba-medium");
-                        }
-                        drop(engine2);
-                        let stt2 = handle.state::<SttState>();
-                        let stt_engine2 = stt2.0.lock().expect("stt lock");
-                        if !stt_engine2.is_active_ready() {
-                            eprintln!("[setup] auto-downloading STT model");
-                            let _ = stt_engine2.download_model(stt_engine2.active_model());
-                        }
-                        drop(stt_engine2);
-                        let sum2 = handle.state::<SummarizerState>();
-                        let sum_engine2 = sum2.0.lock().expect("summarizer lock");
-                        if !sum_engine2.is_active_ready() {
-                            eprintln!("[setup] auto-downloading summarizer model");
-                            let _ = sum_engine2.download_model(sum_engine2.active_model());
-                        }
-                        drop(sum_engine2);
                     }
                 });
             }

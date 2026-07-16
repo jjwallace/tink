@@ -71,11 +71,6 @@ extern "C" {
     );
     fn CFRunLoopRun();
     fn CGEventTapEnable(tap: *const std::ffi::c_void, enable: bool);
-    fn CFMachPortIsValid(port: *const std::ffi::c_void) -> bool;
-
-    // Accessibility trust check — pass a CFDictionary with
-    // kAXTrustedCheckOptionPrompt=true to auto-show the system dialog.
-    fn AXIsProcessTrustedWithOptions(options: *const std::ffi::c_void) -> bool;
 
     static kCFRunLoopCommonModes: *const std::ffi::c_void;
 }
@@ -83,7 +78,7 @@ extern "C" {
 // CGEvent constants
 const K_CG_HID_EVENT_TAP: u32 = 0;
 const K_CG_HEAD_INSERT_EVENT_TAP: u32 = 0;
-const K_CG_EVENT_TAP_OPTION_DEFAULT: u32 = 0; // active tap — can suppress events
+const K_CG_EVENT_TAP_OPTION_LISTEN_ONLY: u32 = 1;
 const K_CG_EVENT_OTHER_MOUSE_DOWN: u32 = 25;
 const K_CG_EVENT_LEFT_MOUSE_UP: u32 = 2;
 const K_CG_EVENT_LEFT_MOUSE_DRAGGED: u32 = 6;
@@ -219,36 +214,12 @@ fn key_to_keycode(s: &str) -> Option<u16> {
         }
     }
     Some(match s {
-        // Navigation
         "PageUp" => 116,
         "PageDown" => 121,
         "Home" => 115,
         "End" => 119,
         "Insert" => 114,
-        "Delete" => 117,    // forward-delete (⌦)
-        "Backspace" => 51,  // delete/backspace (⌫)
-        // Arrow keys
-        "ArrowUp" => 126,
-        "ArrowDown" => 125,
-        "ArrowLeft" => 123,
-        "ArrowRight" => 124,
-        // Common keys
-        "Space" => 49,
-        "Enter" | "Return" => 36,
-        "Tab" => 48,
-        // Punctuation / symbol (ANSI layout)
-        "Backquote" => 50,
-        "Minus" => 27,
-        "Equal" => 24,
-        "BracketLeft" => 33,
-        "BracketRight" => 30,
-        "Backslash" => 42,
-        "Semicolon" => 41,
-        "Quote" => 39,
-        "Comma" => 43,
-        "Period" => 47,
-        "Slash" => 44,
-        // Function keys
+        "Delete" => 117, // forward-delete; Backspace is 51, skipped on purpose
         "F1" => 122,
         "F2" => 120,
         "F3" => 99,
@@ -636,69 +607,29 @@ pub fn install_event_tap(app_handle: tauri::AppHandle) {
     *GLOBAL_APP_HANDLE.lock().expect("global handle") = Some(app_handle);
 
     std::thread::spawn(|| unsafe {
-        // Check Accessibility trust — required for kCGHIDEventTap key events.
-        // If not yet approved, open the System Settings pane so the user can
-        // add the app in one click. The retry loop below handles the case
-        // where the user approves while the app is already running.
-        let trusted = AXIsProcessTrustedWithOptions(std::ptr::null());
-        if !trusted {
-            eprintln!("[hotkeys] Accessibility not yet granted — opening System Settings");
-            let _ = std::process::Command::new("open")
-                .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
-                .spawn();
-        }
-
+        // Listen for middle click, left drag, left mouse-up, key down/up.
         let event_mask: u64 = (1 << K_CG_EVENT_OTHER_MOUSE_DOWN)
             | (1 << K_CG_EVENT_LEFT_MOUSE_UP)
             | (1 << K_CG_EVENT_LEFT_MOUSE_DRAGGED)
             | (1 << K_CG_EVENT_KEY_DOWN)
             | (1 << K_CG_EVENT_KEY_UP);
-
-        // Retry loop: if Accessibility isn't granted yet, wait and retry.
-        // This handles the case where the user approves while the app is open.
-        let mut notified = false;
-        let tap = loop {
-            let t = CGEventTapCreate(
-                K_CG_HID_EVENT_TAP,
-                K_CG_HEAD_INSERT_EVENT_TAP,
-                K_CG_EVENT_TAP_OPTION_DEFAULT, // active tap — can suppress events
-                event_mask,
-                mouse_event_callback,
-                std::ptr::null_mut(),
-            );
-            if !t.is_null() {
-                break t;
-            }
-            if !notified {
-                notified = true;
-                if let Ok(guard) = GLOBAL_APP_HANDLE.lock() {
-                    if let Some(handle) = guard.as_ref() {
-                        let _ = handle.emit("accessibility-needed", ());
-                    }
-                }
-            }
-            eprintln!("[hotkeys] event tap unavailable — waiting for Accessibility permission");
-            std::thread::sleep(std::time::Duration::from_secs(3));
-        };
-
+        let tap = CGEventTapCreate(
+            K_CG_HID_EVENT_TAP,
+            K_CG_HEAD_INSERT_EVENT_TAP,
+            K_CG_EVENT_TAP_OPTION_LISTEN_ONLY,
+            event_mask,
+            mouse_event_callback,
+            std::ptr::null_mut(),
+        );
+        if tap.is_null() {
+            eprintln!("Failed to create event tap — grant Accessibility permissions");
+            return;
+        }
         CGEventTapEnable(tap, true);
         let source = CFMachPortCreateRunLoopSource(std::ptr::null(), tap, 0);
         let rl = CFRunLoopGetCurrent();
         CFRunLoopAddSource(rl, source, kCFRunLoopCommonModes);
-        // Run loop + watchdog: macOS disables the tap if a callback is too slow.
-        // Check every 5 s and re-enable if needed.
-        loop {
-            // Run the loop for 5 s then check tap health.
-            CFRunLoopRun();
-            // CFRunLoopRun returns when the run loop is stopped. In practice
-            // this shouldn't happen, but if the tap is disabled macOS will
-            // call CFRunLoopStop internally. Re-enable and continue.
-            if !CFMachPortIsValid(tap) {
-                eprintln!("[hotkeys] event tap invalidated — Accessibility revoked?");
-                break;
-            }
-            CGEventTapEnable(tap, true);
-        }
+        CFRunLoopRun(); // blocks forever
     });
 }
 

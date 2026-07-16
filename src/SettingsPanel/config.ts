@@ -13,41 +13,37 @@ import type { SettingRowDef, SettingsSection } from "./types";
 // Must stay in sync with `parse_shortcut` / `key_to_keycode` in
 // src-tauri/src/hotkeys.rs.
 export const SUPPORTED_HOTKEYS = new Set([
-  // Navigation / extended keys (usable bare — not in normal typing)
-  "PageUp", "PageDown", "Home", "End", "Insert", "Delete",
-  "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
-  "Backspace", "Tab", "Enter", "Space",
-  // Function keys
-  "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10",
-  "F11", "F12", "F13", "F14", "F15", "F16", "F17", "F18", "F19", "F20",
-  // Punctuation / symbol keys — require modifier to avoid typing conflicts
-  "Backquote", "Minus", "Equal",
-  "BracketLeft", "BracketRight", "Backslash",
-  "Semicolon", "Quote", "Comma", "Period", "Slash",
+  "PageUp",
+  "PageDown",
+  "Home",
+  "End",
+  "Insert",
+  "Delete",
+  "F1",
+  "F2",
+  "F3",
+  "F4",
+  "F5",
+  "F6",
+  "F7",
+  "F8",
+  "F9",
+  "F10",
+  "F11",
+  "F12",
+  "F13",
+  "F14",
+  "F15",
+  "F16",
+  "F17",
+  "F18",
+  "F19",
+  "F20",
 ]);
 
 export const HOTKEY_LABEL: Record<string, string> = {
   PageDown: "PageDn",
   PageUp: "PageUp",
-  ArrowUp: "↑",
-  ArrowDown: "↓",
-  ArrowLeft: "←",
-  ArrowRight: "→",
-  Backspace: "⌫",
-  Enter: "↩",
-  Space: "Space",
-  Tab: "Tab",
-  Backquote: "`",
-  Minus: "-",
-  Equal: "=",
-  BracketLeft: "[",
-  BracketRight: "]",
-  Backslash: "\\",
-  Semicolon: ";",
-  Quote: "'",
-  Comma: ",",
-  Period: ".",
-  Slash: "/",
 };
 
 /// Modifier order used when serializing chord shortcuts. Cmd first so a

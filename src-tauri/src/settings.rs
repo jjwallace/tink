@@ -86,12 +86,6 @@ pub struct Settings {
     // and sounds still respond; only the text animation is gated.
     #[serde(default = "default_true")]
     pub stt_text_display_enabled: bool,
-    // TTS output volume, 0.0–1.0. Applied to the rodio Sink before
-    // each phrase plays. Defaults to 0.8 so there's headroom.
-    #[serde(default = "default_tts_volume")]
-    pub tts_volume: f32,
-    #[serde(default = "default_sfx_volume")]
-    pub sfx_volume: f32,
     // User-added Piper voices beyond the built-in defaults. Persisted
     // here so they survive restarts; registered into TtsEngine on app
     // start (see lib.rs setup). Empty for fresh installs.
@@ -99,8 +93,6 @@ pub struct Settings {
     pub custom_voices: Vec<voice_core::tts::VoiceSpec>,
 }
 
-fn default_tts_volume() -> f32 { 0.8 }
-fn default_sfx_volume() -> f32 { 0.7 }
 fn default_voice_anchor_x() -> f32 { 0.8 }
 fn default_voice_anchor_y() -> f32 { 0.5 }
 
@@ -201,8 +193,6 @@ impl Default for Settings {
             stt_on_sound: "record-on-crt".into(),
             stt_off_sound: "record-off-crt".into(),
             stt_text_display_enabled: true,
-            tts_volume: 0.8,
-            sfx_volume: 0.7,
             custom_voices: Vec::new(),
         }
     }

@@ -63,10 +63,13 @@ pub fn start_anchor_proximity_poll(handle: tauri::AppHandle) {
     use crate::state::AppSettings;
 
     std::thread::spawn(move || {
-        // SIZE/2 = 85 px logical — covers the full hit zone of the
-        // anchor root div so the window stays interactive anywhere
-        // inside the tap target, not just on the visible orb.
-        const HOVER_RADIUS: f64 = 85.0;
+        // Visible orb disc is 27 px radius; 55 covers it with a comfortable
+        // grab margin. The JS hover-pin (set_anchor_dragging on mouseenter)
+        // extends interactivity to the full 85 px DOM zone once the cursor
+        // has entered. Matching HOVER_RADIUS to SIZE/2 (85) made the boundary
+        // oscillate: the poll would flip click-through at exactly 85 pt,
+        // swallowing mouseleave and mousedown and freezing hover effects.
+        const HOVER_RADIUS: f64 = 55.0;
         loop {
             std::thread::sleep(std::time::Duration::from_millis(60));
 

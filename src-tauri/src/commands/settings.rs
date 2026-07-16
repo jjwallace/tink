@@ -84,8 +84,6 @@ pub fn get_all_settings(
         "stt_on_sound": s.stt_on_sound,
         "stt_off_sound": s.stt_off_sound,
         "stt_text_display_enabled": s.stt_text_display_enabled,
-        "tts_volume": s.tts_volume,
-        "sfx_volume": s.sfx_volume,
         "tts_models": tts_models,
         "tts_voices": tts_voices,
         "tts_current_voice": tts.current_voice(),
@@ -213,14 +211,6 @@ pub fn update_setting(
         "stt_text_display_enabled" => {
             s.stt_text_display_enabled = value == "true";
             let _ = app.emit("stt-text-display-enabled", &s.stt_text_display_enabled);
-        }
-        "tts_volume" => {
-            s.tts_volume = value.parse::<f32>().unwrap_or(0.8).clamp(0.0, 1.0);
-            let _ = app.emit("tts-volume-changed", s.tts_volume);
-        }
-        "sfx_volume" => {
-            s.sfx_volume = value.parse::<f32>().unwrap_or(0.7).clamp(0.0, 1.0);
-            let _ = app.emit("sfx-volume-changed", s.sfx_volume);
         }
         _ => return Err(format!("Unknown setting: {}", key)),
     }

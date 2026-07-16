@@ -2519,29 +2519,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "native"
-version = "0.1.0"
-dependencies = [
- "block2",
- "cpal",
- "encoding_rs",
- "llama-cpp-2",
- "objc2",
- "objc2-app-kit",
- "objc2-foundation",
- "rodio",
- "serde",
- "serde_json",
- "sherpa-rs",
- "sysinfo",
- "tauri",
- "tauri-build",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-opener",
- "voice-core",
-]
-
-[[package]]
 name = "ndk"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4790,6 +4767,29 @@ checksum = "2e70e4c5a0e0a8a4823ad65dfe1a6930e4f4d756dcd9dd7939022b5e8c501215"
 dependencies = [
  "num-conv",
  "time-core",
+]
+
+[[package]]
+name = "tink"
+version = "0.1.0"
+dependencies = [
+ "block2",
+ "cpal",
+ "encoding_rs",
+ "llama-cpp-2",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "rodio",
+ "serde",
+ "serde_json",
+ "sherpa-rs",
+ "sysinfo",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-opener",
+ "voice-core",
 ]
 
 [[package]]

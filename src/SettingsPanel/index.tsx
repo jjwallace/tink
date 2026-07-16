@@ -198,12 +198,7 @@ export default function SettingsPanel() {
   const updateSetting = async (key: string, value: string) => {
     const s = settings();
     if (!s) return;
-    const FLOAT_KEYS = new Set(["tts_volume", "sfx_volume", "voice_anchor_x", "voice_anchor_y"]);
-    const parsed: boolean | number | string = BOOL_KEYS.has(key)
-      ? value === "true"
-      : FLOAT_KEYS.has(key)
-      ? parseFloat(value)
-      : value;
+    const parsed: boolean | string = BOOL_KEYS.has(key) ? value === "true" : value;
     setSettings({ ...s, [key]: parsed } as AllSettings);
     try {
       await invoke("update_setting", { key, value });
@@ -508,8 +503,6 @@ export default function SettingsPanel() {
             "background-image": "var(--panel-bg-image), var(--panel-bg)",
             padding: "16px 20px",
             "overflow-y": "auto",
-            "scrollbar-width": "thin",
-            "scrollbar-color": "var(--control-border) transparent",
             "border-left": "1px solid var(--panel-border)",
             "box-shadow":
               "-20px 0 40px rgba(0,0,0,0.4), inset 1px 0 0 var(--edge-highlight)",
@@ -521,18 +514,14 @@ export default function SettingsPanel() {
             opacity: "1",
           }}
         >
-          {/* Title strip — sticky so the ✕ is always reachable when scrolled. */}
+          {/* Title strip — dark/light text on theme bg. Draggable region (the
+              onMouseDown handler gates on clientY<50). */}
           <div
             style={{
-              position: "sticky",
-              top: "0",
-              "z-index": "10",
-              background: "var(--panel-bg)",
               display: "flex",
               "align-items": "center",
               "justify-content": "space-between",
-              "padding-bottom": "14px",
-              "margin-bottom": "0",
+              "margin-bottom": "14px",
               cursor: "grab",
               "user-select": "none",
             }}
@@ -663,20 +652,6 @@ export default function SettingsPanel() {
               value={getValue("auto_speak")}
               onChange={(v) => updateSetting("auto_speak", v)}
             />
-            {/* TTS Volume */}
-            <div style={{ display: "flex", "align-items": "center", gap: "10px", padding: "4px 0" }}>
-              <span style={{ "font-size": "11px", "font-family": FONT, color: "var(--text-secondary)", "min-width": "52px" }}>Volume</span>
-              <input
-                type="range"
-                min="0" max="1" step="0.05"
-                value={settings()?.tts_volume ?? 0.8}
-                onInput={(e) => updateSetting("tts_volume", e.currentTarget.value)}
-                style={{ flex: "1", "accent-color": PURPLE, cursor: "pointer" }}
-              />
-              <span style={{ "font-size": "11px", "font-family": FONT, color: "var(--text-muted)", "min-width": "28px", "text-align": "right" }}>
-                {Math.round((settings()?.tts_volume ?? 0.8) * 100)}%
-              </span>
-            </div>
             <HotkeyCaptureRow
               value={getValue("shortcut")}
               onChange={(v) => updateSetting("shortcut", v)}
@@ -698,6 +673,36 @@ export default function SettingsPanel() {
                   />
                 )}
               </For>
+              <AddVoiceRow
+                open={addVoiceOpen()}
+                voiceId={addVoiceId()}
+                error={addVoiceErr()}
+                onToggle={() => {
+                  setAddVoiceOpen(!addVoiceOpen());
+                  setAddVoiceErr(null);
+                }}
+                onChangeId={(v) => {
+                  setAddVoiceId(v);
+                  setAddVoiceErr(null);
+                }}
+                onAdd={async () => {
+                  const id = addVoiceId().trim();
+                  if (!id) {
+                    setAddVoiceErr("Enter a Piper voice ID");
+                    return;
+                  }
+                  try {
+                    await invoke("add_custom_voice", { piperId: id });
+                    setAddVoiceId("");
+                    setAddVoiceOpen(false);
+                    fetchSettings();
+                    // Auto-trigger the download for the freshly added voice.
+                    downloadVoiceModel(id);
+                  } catch (err) {
+                    setAddVoiceErr(String(err));
+                  }
+                }}
+              />
             </div>
           </SectionBox>
 
@@ -815,22 +820,10 @@ export default function SettingsPanel() {
             />
           </SectionBox>
 
-          {/* Sounds — volume + three paired toggle + picker rows. */}
+          {/* Sounds — three paired toggle + picker rows. Start plays when
+              Claude begins, Milestone during tool calls, Complete when a
+              response finishes. Each independently toggleable. */}
           <SectionBox title="Sounds">
-            {/* SFX Volume */}
-            <div style={{ display: "flex", "align-items": "center", gap: "10px", padding: "4px 0" }}>
-              <span style={{ "font-size": "11px", "font-family": FONT, color: "var(--text-secondary)", "min-width": "52px" }}>Volume</span>
-              <input
-                type="range"
-                min="0" max="1" step="0.05"
-                value={settings()?.sfx_volume ?? 0.7}
-                onInput={(e) => updateSetting("sfx_volume", e.currentTarget.value)}
-                style={{ flex: "1", "accent-color": PURPLE, cursor: "pointer" }}
-              />
-              <span style={{ "font-size": "11px", "font-family": FONT, color: "var(--text-muted)", "min-width": "28px", "text-align": "right" }}>
-                {Math.round((settings()?.sfx_volume ?? 0.7) * 100)}%
-              </span>
-            </div>
             <SoundSubRow
               label="Start"
               enabledKey="start_enabled"
