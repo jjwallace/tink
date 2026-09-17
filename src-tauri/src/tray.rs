@@ -184,48 +184,62 @@ pub fn handle_menu_event(app: &tauri::AppHandle, event: tauri::menu::MenuEvent) 
 fn switch_to_next_screen(app: &tauri::AppHandle) {
     #[cfg(target_os = "macos")]
     {
-        use objc2::MainThreadMarker;
-        use objc2_app_kit::{NSScreen, NSWindow};
+        // Tray / popup menu events aren't guaranteed to be delivered on
+        // the main thread, and NSScreen / NSWindow access off-main
+        // silently misbehaves (same class of bug that made the anchor
+        // unclickable). Hop to the main thread so the frame move always
+        // lands.
+        let app = app.clone();
+        let _ = app.clone().run_on_main_thread(move || {
+            use objc2::MainThreadMarker;
+            use objc2_app_kit::{NSScreen, NSWindow};
 
-        let Some(win) = app.get_webview_window("main") else { return };
-        let Some(mtm) = MainThreadMarker::new() else {
-            eprintln!("[tray] switch-screen must run on main thread");
-            return;
-        };
-        let screens = NSScreen::screens(mtm);
-        if screens.len() < 2 {
-            eprintln!("[tray] only one screen; switch-screen no-op");
-            return;
-        }
-        let ns_win_ptr = match win.ns_window() {
-            Ok(p) => p,
-            Err(_) => return,
-        };
-        unsafe {
-            let ns_window: &NSWindow = &*(ns_win_ptr as *const NSWindow);
-            let current = ns_window.screen();
-            let mut idx = 0usize;
-            if let Some(cur) = current.as_ref() {
-                let cur_frame = cur.frame();
-                for (i, s) in screens.iter().enumerate() {
-                    let f = s.frame();
-                    if f.origin.x == cur_frame.origin.x
-                        && f.origin.y == cur_frame.origin.y
-                    {
-                        idx = i;
-                        break;
+            let Some(win) = app.get_webview_window("main") else { return };
+            let Some(mtm) = MainThreadMarker::new() else {
+                eprintln!("[tray] switch-screen must run on main thread");
+                return;
+            };
+            let screens = NSScreen::screens(mtm);
+            if screens.len() < 2 {
+                eprintln!("[tray] only one screen; switch-screen no-op");
+                return;
+            }
+            let ns_win_ptr = match win.ns_window() {
+                Ok(p) => p,
+                Err(_) => return,
+            };
+            unsafe {
+                let ns_window: &NSWindow = &*(ns_win_ptr as *const NSWindow);
+                let current = ns_window.screen();
+                let mut idx = 0usize;
+                if let Some(cur) = current.as_ref() {
+                    let cur_frame = cur.frame();
+                    for (i, s) in screens.iter().enumerate() {
+                        let f = s.frame();
+                        if f.origin.x == cur_frame.origin.x
+                            && f.origin.y == cur_frame.origin.y
+                        {
+                            idx = i;
+                            break;
+                        }
                     }
                 }
+                let next_idx = (idx + 1) % screens.len();
+                let next = screens.objectAtIndex(next_idx);
+                let frame = next.frame();
+                ns_window.setFrame_display(frame, true);
+                // Pin so the pre-narration / wake reposition doesn't drag
+                // the overlay back to the mouse's screen. Keyed by frame
+                // origin (index isn't stable across hot-plug).
+                if let Ok(mut pin) = crate::state::PINNED_SCREEN.lock() {
+                    *pin = Some((frame.origin.x, frame.origin.y));
+                }
+                eprintln!(
+                    "[tray] switched to screen {} ({}x{} at {},{}) — pinned",
+                    next_idx, frame.size.width, frame.size.height, frame.origin.x, frame.origin.y,
+                );
             }
-            let next_idx = (idx + 1) % screens.len();
-            let next = screens.objectAtIndex(next_idx);
-            let frame = next.frame();
-            ns_window.setFrame_display(frame, true);
-            eprintln!(
-                "[tray] switched to screen {} ({}x{} at {},{})",
-                next_idx, frame.size.width, frame.size.height, frame.origin.x, frame.origin.y,
-            );
-        }
+        });
     }
 
     #[cfg(not(target_os = "macos"))]

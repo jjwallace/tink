@@ -84,6 +84,19 @@ const K_CG_EVENT_LEFT_MOUSE_UP: u32 = 2;
 const K_CG_EVENT_LEFT_MOUSE_DRAGGED: u32 = 6;
 const K_CG_EVENT_KEY_DOWN: u32 = 10;
 const K_CG_EVENT_KEY_UP: u32 = 11;
+// macOS disables an event tap and delivers one of these event types when
+// the callback ran too long (timeout) or a burst of user input outpaced
+// it (heavy typing). A disabled tap stops delivering — Esc-to-stop,
+// push-to-talk and middle-click go dead until re-enabled. We stash the
+// tap pointer in EVENT_TAP so the callback can turn it back on.
+const K_CG_EVENT_TAP_DISABLED_BY_TIMEOUT: u32 = 0xFFFF_FFFE;
+const K_CG_EVENT_TAP_DISABLED_BY_USER_INPUT: u32 = 0xFFFF_FFFF;
+
+/// The live CGEvent tap (CFMachPort), stashed at install time so the
+/// callback can re-enable it after macOS disables it. Raw pointer to a
+/// process-lifetime Core Foundation object; never freed.
+static EVENT_TAP: std::sync::atomic::AtomicPtr<std::ffi::c_void> =
+    std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
 const K_VK_ESCAPE: u16 = 53;
 const K_CG_EVENT_FLAG_MASK_SHIFT: u64 = 0x00020000;
 pub const K_CG_EVENT_FLAG_MASK_CONTROL: u64 = 0x00040000;
@@ -279,6 +292,17 @@ extern "C" fn mouse_event_callback(
     _user_info: *mut std::ffi::c_void,
 ) -> *const std::ffi::c_void {
     match event_type {
+        K_CG_EVENT_TAP_DISABLED_BY_TIMEOUT | K_CG_EVENT_TAP_DISABLED_BY_USER_INPUT => {
+            // macOS just disabled our tap (slow callback or an input
+            // burst like fast typing). Turn it back on so global hotkeys
+            // keep working; otherwise Esc/push-to-talk/middle-click stay
+            // dead for the rest of the session.
+            let tap = EVENT_TAP.load(std::sync::atomic::Ordering::Acquire);
+            if !tap.is_null() {
+                unsafe { CGEventTapEnable(tap as *const std::ffi::c_void, true) };
+            }
+            return event;
+        }
         K_CG_EVENT_OTHER_MOUSE_DOWN => {
             // Middle click → speak selection. Gated by both the master
             // speak-selection enable and the middle-click sub-toggle so
@@ -625,6 +649,9 @@ pub fn install_event_tap(app_handle: tauri::AppHandle) {
             eprintln!("Failed to create event tap — grant Accessibility permissions");
             return;
         }
+        // Stash the tap so mouse_event_callback can re-enable it if
+        // macOS disables it (timeout / user-input burst).
+        EVENT_TAP.store(tap as *mut std::ffi::c_void, std::sync::atomic::Ordering::Release);
         CGEventTapEnable(tap, true);
         let source = CFMachPortCreateRunLoopSource(std::ptr::null(), tap, 0);
         let rl = CFRunLoopGetCurrent();

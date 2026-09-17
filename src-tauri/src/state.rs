@@ -122,3 +122,19 @@ pub static LAST_MIDDLE_CLICK: Mutex<Option<std::time::Instant>> = Mutex::new(Non
 /// callback reads this to suppress speak-selection on drag-end (the
 /// release click that ends a drag shouldn't also trigger TTS).
 pub static WAS_DRAGGING: AtomicBool = AtomicBool::new(false);
+
+// ── Screen selection ───────────────────────────────────────────────
+
+/// The screen the user manually pinned via the tray's "Switch Screen"
+/// item, stored as its NSScreen frame origin `(x, y)` (stable across
+/// the session; index isn't, because hot-plug reorders the screen
+/// list). `None` = no manual pin, so the overlay auto-follows the
+/// mouse's screen on wake / before each narration.
+///
+/// Why this exists: `reposition_to_mouse_screen` runs before every
+/// speak and on wake, force-moving the overlay to the mouse's screen.
+/// Without a pin, that instantly undoes a manual "Switch Screen", so
+/// the button appeared not to work. When a pin is set,
+/// `reposition_to_mouse_screen` targets the pinned screen instead.
+/// Cleared automatically if the pinned screen disconnects.
+pub static PINNED_SCREEN: Mutex<Option<(f64, f64)>> = Mutex::new(None);

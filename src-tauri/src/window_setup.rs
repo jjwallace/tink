@@ -31,19 +31,59 @@ use crate::state::CursorCtl;
 /// when the settings panel is open OR the user is hovering the voice
 /// anchor; otherwise the window is click-through and the user
 /// interacts with whatever app is underneath.
+///
+/// **Must run on the main thread.** It reads and writes NSWindow's
+/// `ignoresMouseEvents`, and AppKit window state is only safe to touch
+/// from the main thread. Call `request_apply_cursor_state` from any
+/// other thread (the proximity poll, Tauri command workers) — it hops
+/// onto the main thread for you. Calling this directly off-main was the
+/// cause of the "anchor becomes unclickable" bug: the off-main
+/// `ignoresMouseEvents()` read returned stale values, so the idempotent
+/// early-return below fired when the window was actually still
+/// click-through, and the self-heal never landed.
 pub fn apply_cursor_state(handle: &tauri::AppHandle) {
     let ctl = handle.state::<std::sync::Arc<CursorCtl>>();
     let interactive = ctl.is_interactive();
-    if let Some(win) = handle.get_webview_window("main") {
-        let _ = win.set_ignore_cursor_events(!interactive);
+    let Some(win) = handle.get_webview_window("main") else { return };
+    let want_ignore = !interactive;
+
+    // Idempotent: skip the AppKit round-trip when the NSWindow already
+    // matches the desired state. This lets the proximity poll call us
+    // every tick (level-triggered self-heal) without flicker or churn.
+    // Sound only because we're on the main thread (see doc comment).
+    #[cfg(target_os = "macos")]
+    {
+        use objc2_app_kit::NSWindow;
+        if let Ok(ptr) = win.ns_window() {
+            unsafe {
+                let ns: &NSWindow = &*(ptr as *const NSWindow);
+                if ns.ignoresMouseEvents() == want_ignore {
+                    return;
+                }
+            }
+        }
     }
+
+    let _ = win.set_ignore_cursor_events(want_ignore);
+}
+
+/// Thread-safe entry point for reconciling cursor state. Hops onto the
+/// main thread and runs `apply_cursor_state` there. Safe to call from
+/// the proximity poll thread or a Tauri command worker; if we happen to
+/// already be on the main thread, Tauri just schedules it on the event
+/// loop (no deadlock, runs promptly).
+pub fn request_apply_cursor_state(handle: &tauri::AppHandle) {
+    // Borrow the caller's handle for the dispatch call; move a separate
+    // clone into the closure so the two don't alias (E0505).
+    let h = handle.clone();
+    let _ = handle.run_on_main_thread(move || apply_cursor_state(&h));
 }
 
 #[tauri::command]
 pub fn set_settings_open(open: bool, handle: tauri::AppHandle) {
     let ctl = handle.state::<std::sync::Arc<CursorCtl>>();
     ctl.settings_open.store(open, Ordering::Relaxed);
-    apply_cursor_state(&handle);
+    request_apply_cursor_state(&handle);
 }
 
 /// Called from JS at drag start (true) and drag end / inertia rest
@@ -53,7 +93,7 @@ pub fn set_settings_open(open: bool, handle: tauri::AppHandle) {
 pub fn set_anchor_dragging(active: bool, handle: tauri::AppHandle) {
     let ctl = handle.state::<std::sync::Arc<CursorCtl>>();
     ctl.anchor_dragging.store(active, Ordering::Relaxed);
-    apply_cursor_state(&handle);
+    request_apply_cursor_state(&handle);
 }
 
 /// Background poll that flips `CursorCtl::anchor_hover` based on
@@ -85,89 +125,103 @@ pub fn start_anchor_proximity_poll(handle: tauri::AppHandle) {
                 (guard.voice_anchor_x as f64, guard.voice_anchor_y as f64)
             };
 
-            let Some(window) = handle.get_webview_window("main") else { continue };
+            // current_mouse_pos() reads a CGEvent location (global, top-left
+            // origin, spans all displays) — safe to call off the main thread.
+            let (mx, my) = current_mouse_pos();
 
-            // In dev mode Tauri's inner_size() may return the config size
-            // (800×600) even after configure_main_window has resized the
-            // NSWindow to fullscreen — the Tauri API caches until a proper
-            // Cocoa resize event fires. Read the NSWindow frame directly so
-            // dev and release behave identically.
+            // Everything below reads NSWindow.frame() / NSScreen and decides
+            // click-through — all of which is main-thread-only. Reading the
+            // frame off-main returns stale geometry, and crucially
+            // MainThreadMarker::new() FAILS on this poll thread, so the
+            // Cocoa(bottom-left)→CG(top-left) y-flip used to fall back to the
+            // window's OWN height instead of the MAIN screen height. That is
+            // correct by accident while the overlay is on the main display
+            // (window height == main height) but wrong the moment it sits on
+            // a secondary display — `anchor_y` lands off, `near` is never
+            // true, and the anchor becomes unclickable on that screen (the
+            // "for some random reason we can't click it" report — it had
+            // moved there via Switch Screen or reposition-to-mouse). Do the
+            // read, the hover decision, and the cursor-state apply together
+            // on the main thread so the marker is valid and geometry is live.
             #[cfg(target_os = "macos")]
-            let (screen_w, screen_h) = {
-                use objc2_app_kit::NSWindow;
-                if let Ok(ptr) = window.ns_window() {
-                    unsafe {
+            {
+                let h = handle.clone();
+                let _ = handle.run_on_main_thread(move || {
+                    use objc2::MainThreadMarker;
+                    use objc2_app_kit::{NSScreen, NSWindow};
+
+                    let Some(window) = h.get_webview_window("main") else { return };
+                    let Ok(ptr) = window.ns_window() else { return };
+
+                    let (screen_w, screen_h, win_x, win_cg_y) = unsafe {
                         let ns: &NSWindow = &*(ptr as *const NSWindow);
                         let f = ns.frame();
-                        (f.size.width, f.size.height)
+                        // MAIN screen height for the y-flip. On the main
+                        // thread the marker is valid, so this is the real
+                        // primary screen — not the window's current screen.
+                        let primary_h = MainThreadMarker::new()
+                            .and_then(|mtm| {
+                                NSScreen::screens(mtm)
+                                    .iter()
+                                    .next()
+                                    .map(|s| s.frame().size.height)
+                            })
+                            .unwrap_or(f.size.height);
+                        let cg_y = primary_h - (f.origin.y + f.size.height);
+                        (f.size.width, f.size.height, f.origin.x, cg_y)
+                    };
+
+                    let anchor_x = win_x + fx * screen_w;
+                    let anchor_y = win_cg_y + fy * screen_h;
+                    let dx = mx - anchor_x;
+                    let dy = my - anchor_y;
+                    let near = (dx * dx + dy * dy) < HOVER_RADIUS * HOVER_RADIUS;
+
+                    let ctl = h.state::<std::sync::Arc<CursorCtl>>();
+                    let prev = ctl.anchor_hover.load(Ordering::Relaxed);
+                    // Don't flip to non-hover while a drag is active — the
+                    // saved anchor position lags the live orb position so the
+                    // poll would otherwise kill interactivity mid-drag.
+                    let dragging = ctl.anchor_dragging.load(Ordering::Relaxed);
+                    if near != prev && !(prev && !near && dragging) {
+                        ctl.anchor_hover.store(near, Ordering::Relaxed);
                     }
-                } else {
+
+                    // Level-triggered self-heal, every tick: re-assert
+                    // click-through so any desync (screen reposition, dropped
+                    // set_ignore call) corrects within 60 ms. Already on the
+                    // main thread, so call apply directly; its idempotent
+                    // early-return keeps this a cheap no-op when correct.
+                    apply_cursor_state(&h);
+                });
+            }
+
+            #[cfg(not(target_os = "macos"))]
+            {
+                let Some(window) = handle.get_webview_window("main") else { continue };
+                let (screen_w, screen_h) = {
                     let s = window.inner_size().unwrap_or_default();
                     let sc = window.scale_factor().unwrap_or(1.0);
                     (s.width as f64 / sc, s.height as f64 / sc)
-                }
-            };
-
-            #[cfg(not(target_os = "macos"))]
-            let (screen_w, screen_h) = {
-                let s = window.inner_size().unwrap_or_default();
-                let sc = window.scale_factor().unwrap_or(1.0);
-                (s.width as f64 / sc, s.height as f64 / sc)
-            };
-
-            // NSWindow.frame origin in Cocoa coords (bottom-left origin, y up).
-            // current_mouse_pos() uses CGEvent which also has top-left origin
-            // (y down), so we get the screen height to flip the y of the origin.
-            #[cfg(target_os = "macos")]
-            let win_origin = {
-                use objc2_app_kit::{NSScreen, NSWindow};
-                use objc2::MainThreadMarker;
-                if let Ok(ptr) = window.ns_window() {
-                    unsafe {
-                        let ns: &NSWindow = &*(ptr as *const NSWindow);
-                        let f = ns.frame();
-                        // Primary screen height for Cocoa→CG coord flip.
-                        let primary_h = if let Some(mtm) = MainThreadMarker::new() {
-                            NSScreen::screens(mtm)
-                                .iter()
-                                .next()
-                                .map(|s| s.frame().size.height)
-                                .unwrap_or(screen_h)
-                        } else { screen_h };
-                        // CG y = primary_h - (cocoa_y + window_h)
-                        let cg_y = primary_h - (f.origin.y + f.size.height);
-                        (f.origin.x, cg_y)
-                    }
-                } else {
+                };
+                let win_origin = {
                     let p = window.inner_position().unwrap_or_default();
                     let sc = window.scale_factor().unwrap_or(1.0);
                     (p.x as f64 / sc, p.y as f64 / sc)
+                };
+                let anchor_x = win_origin.0 + fx * screen_w;
+                let anchor_y = win_origin.1 + fy * screen_h;
+                let dx = mx - anchor_x;
+                let dy = my - anchor_y;
+                let near = (dx * dx + dy * dy) < HOVER_RADIUS * HOVER_RADIUS;
+
+                let ctl = handle.state::<std::sync::Arc<CursorCtl>>();
+                let prev = ctl.anchor_hover.load(Ordering::Relaxed);
+                let dragging = ctl.anchor_dragging.load(Ordering::Relaxed);
+                if near != prev && !(prev && !near && dragging) {
+                    ctl.anchor_hover.store(near, Ordering::Relaxed);
                 }
-            };
-
-            #[cfg(not(target_os = "macos"))]
-            let win_origin = {
-                let p = window.inner_position().unwrap_or_default();
-                let sc = window.scale_factor().unwrap_or(1.0);
-                (p.x as f64 / sc, p.y as f64 / sc)
-            };
-
-            let (mx, my) = current_mouse_pos();
-            let anchor_x = win_origin.0 + fx * screen_w;
-            let anchor_y = win_origin.1 + fy * screen_h;
-            let dx = mx - anchor_x;
-            let dy = my - anchor_y;
-            let near = (dx * dx + dy * dy) < HOVER_RADIUS * HOVER_RADIUS;
-
-            let ctl = handle.state::<std::sync::Arc<CursorCtl>>();
-            let prev = ctl.anchor_hover.load(Ordering::Relaxed);
-            // Don't flip to non-hover while a drag is active — the
-            // saved anchor position lags the live orb position so the
-            // poll would otherwise kill interactivity mid-drag.
-            let dragging = ctl.anchor_dragging.load(Ordering::Relaxed);
-            if near != prev && !(prev && !near && dragging) {
-                ctl.anchor_hover.store(near, Ordering::Relaxed);
-                apply_cursor_state(&handle);
+                request_apply_cursor_state(&handle);
             }
         }
     });
@@ -191,11 +245,38 @@ pub fn reposition_to_mouse_screen(app: &tauri::AppHandle) {
             let screens = NSScreen::screens(mtm);
             let mut target_frame = None;
 
-            for screen in screens.iter() {
-                let f = screen.frame();
-                if mx >= f.origin.x && mx < f.origin.x + f.size.width {
-                    target_frame = Some(f);
-                    break;
+            // Manual "Switch Screen" pin wins over mouse-follow. If the
+            // pinned screen is still connected, target it; if it's gone
+            // (unplugged), clear the pin and fall through to mouse-follow.
+            let pinned = crate::state::PINNED_SCREEN
+                .lock()
+                .ok()
+                .and_then(|g| *g);
+            if let Some((px, py)) = pinned {
+                let mut matched = false;
+                for screen in screens.iter() {
+                    let f = screen.frame();
+                    if f.origin.x == px && f.origin.y == py {
+                        target_frame = Some(f);
+                        matched = true;
+                        break;
+                    }
+                }
+                if !matched {
+                    if let Ok(mut g) = crate::state::PINNED_SCREEN.lock() {
+                        *g = None;
+                    }
+                }
+            }
+
+            // No pin (or pinned screen vanished): follow the mouse.
+            if target_frame.is_none() {
+                for screen in screens.iter() {
+                    let f = screen.frame();
+                    if mx >= f.origin.x && mx < f.origin.x + f.size.width {
+                        target_frame = Some(f);
+                        break;
+                    }
                 }
             }
 

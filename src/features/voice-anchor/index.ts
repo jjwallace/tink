@@ -385,15 +385,25 @@ export class VoiceAnchor {
       this.applyEnabled(ev.payload);
     }).catch((err) => console.error("[voice-anchor] listen enabled-changed failed", err));
 
-    // Startup — glide down from above, clean ease in/out, no overshoot.
-    gsap.from(this.root, {
-      y: -window.innerHeight * 0.7,
-      opacity: 0,
-      scale: 0.8,
-      duration: 0.9,
-      ease: "power2.inOut",
-      delay: 0.3,
-    });
+    // Startup — buoy entrance. Instead of sliding straight down, Tink
+    // zooms in (scales up past its resting size then pulls back, a
+    // single clean overshoot) while bobbing to rest on the "surface"
+    // with a springy, decaying vertical wobble — like a buoy pushed
+    // under then settling on the water. Scale and y run concurrently on
+    // separate eases: back.out for the zoom pull-back, elastic.out for
+    // the buoy bob. Only a small drop (~14% of the viewport) so the
+    // motion reads as "arriving in place", not "falling from the top".
+    const enter = gsap.timeline({ delay: 0.3 });
+    enter.from(
+      this.root,
+      { scale: 0.2, opacity: 0, duration: 0.7, ease: "back.out(1.9)" },
+      0,
+    );
+    enter.from(
+      this.root,
+      { y: -window.innerHeight * 0.14, duration: 1.15, ease: "elastic.out(1, 0.45)" },
+      0,
+    );
   }
 
   current(): AnchorPos {
@@ -966,30 +976,17 @@ export class VoiceAnchor {
           });
         });
 
-        // Compute release velocity from the sample buffer and kick off
-        // the throw if it exceeds a threshold. Below threshold = the
-        // user is "placing" rather than "throwing", so we settle here
-        // and persist immediately like before.
-        const released = this.computeReleaseVelocity(samples);
-        const speed = Math.hypot(released.vx, released.vy);
-        const THROW_SPEED_MIN = 0.2; // screen-fractions per second
+        // Throw disabled. The anchor is a deliberate placement, not a
+        // toss — the user found the fling too easy to trigger and didn't
+        // want the orb flying across the screen. So on release we always
+        // "place": it stays exactly where it was dropped and persists.
+        // (The old path handed a fast release off to startInertia() for
+        // momentum + wall bounces; that behaviour is intentionally gone.
+        // `samples` / computeReleaseVelocity / startInertia are retained
+        // but no longer drive release.)
+        void samples;
 
-        if (speed > THROW_SPEED_MIN) {
-          this.velX = released.vx;
-          this.velY = released.vy;
-          // Extra burst on throw — scales with speed so a hard fling
-          // actually looks like one. Capped so we don't DoS the pool.
-          const burstN = Math.min(48, Math.round(18 + speed * 14));
-          this.burst(burstN);
-          // Start physics. Persist + fireDragEnd happen when inertia
-          // finally comes to rest, inside startInertia(). The
-          // anchor_dragging flag stays true through the throw and is
-          // cleared at inertia settle.
-          this.startInertia();
-          return;
-        }
-
-        // No throw — release the drag pin. If the cursor is still over the
+        // Release the drag pin. If the cursor is still over the
         // anchor the hover pin keeps the window interactive; only clear
         // when the cursor has already left (hovering = false).
         if (!this.hovering) {
