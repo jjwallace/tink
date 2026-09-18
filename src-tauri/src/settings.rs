@@ -27,6 +27,11 @@ pub struct Settings {
     // Default true so existing installs keep their current behaviour.
     #[serde(default = "default_true")]
     pub tts_enabled: bool,
+    // TTS narration output volume, 0.0–1.0. Adjusted live by scrolling
+    // the mouse wheel over the voice anchor; applied to the rodio sink on
+    // each speak. Defaults to 1.0 so existing installs are unchanged.
+    #[serde(default = "default_tts_volume")]
+    pub tts_volume: f32,
     #[serde(default = "default_work_mode")]
     pub work_mode: String,
     #[serde(default = "default_summary_model")]
@@ -124,6 +129,10 @@ fn default_true() -> bool {
     true
 }
 
+fn default_tts_volume() -> f32 {
+    1.0
+}
+
 fn default_work_mode() -> String {
     "iterate".into()
 }
@@ -172,6 +181,7 @@ impl Default for Settings {
             complete_enabled: true,
             stt_enabled: true,
             tts_enabled: true,
+            tts_volume: 1.0,
             work_mode: "iterate".into(),
             summary_model: "smol-360m".into(),
             personality: "ship-computer".into(),

@@ -261,6 +261,7 @@ pub fn do_speak_selection(handle: tauri::AppHandle, summarize: bool) {
 
                     if let Ok((_stream, stream_handle)) = rodio::OutputStream::try_default() {
                         if let Ok(sink) = rodio::Sink::try_new(&stream_handle) {
+                            sink.set_volume(crate::state::tts_volume());
                             let samples_arc = std::sync::Arc::new(samples);
                             let source = rodio::buffer::SamplesBuffer::new(
                                 1, sample_rate, (*samples_arc).clone(),
@@ -394,6 +395,7 @@ pub fn do_speak_text(handle: tauri::AppHandle, raw_text: String) {
 
                 if let Ok((_stream, stream_handle)) = rodio::OutputStream::try_default() {
                     if let Ok(sink) = rodio::Sink::try_new(&stream_handle) {
+                        sink.set_volume(crate::state::tts_volume());
                         let samples_arc = std::sync::Arc::new(samples);
                         let source = rodio::buffer::SamplesBuffer::new(
                             1, sample_rate, (*samples_arc).clone(),
@@ -487,6 +489,7 @@ pub fn speak_brief(text: String, handle: tauri::AppHandle) {
                 Ok((_timings, samples, sample_rate)) => {
                     if let Ok((_stream, stream_handle)) = rodio::OutputStream::try_default() {
                         if let Ok(sink) = rodio::Sink::try_new(&stream_handle) {
+                            sink.set_volume(crate::state::tts_volume());
                             let source = rodio::buffer::SamplesBuffer::new(
                                 1, sample_rate, samples,
                             );

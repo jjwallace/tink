@@ -186,6 +186,7 @@ pub fn run() {
                 SPEAK_SEL_ENABLED.store(s.speak_selection_enabled, std::sync::atomic::Ordering::Relaxed);
                 SPEAK_SEL_MIDDLE_CLICK.store(s.speak_selection_middle_click, std::sync::atomic::Ordering::Relaxed);
                 SPEAK_SEL_SUMMARIZE.store(s.speak_selection_mode == "summarize", std::sync::atomic::Ordering::Relaxed);
+                crate::state::set_tts_volume(s.tts_volume);
             }
 
             // --- Auto-speak HTTP server ---

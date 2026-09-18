@@ -10,7 +10,7 @@
 //! Convention: structs at the top, atomics + mutexes at the bottom.
 //! Atomic names are SCREAMING_SNAKE; expose them as `pub static` so
 //! consumers go through `state::PAUSED` rather than re-defining.
-use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, AtomicU64, Ordering};
 use std::sync::Mutex;
 
 use voice_core::{stt::SttEngine, summarizer::Summarizer, tts::TtsEngine};
@@ -138,3 +138,23 @@ pub static WAS_DRAGGING: AtomicBool = AtomicBool::new(false);
 /// `reposition_to_mouse_screen` targets the pinned screen instead.
 /// Cleared automatically if the pinned screen disconnects.
 pub static PINNED_SCREEN: Mutex<Option<(f64, f64)>> = Mutex::new(None);
+
+// ── TTS output volume ──────────────────────────────────────────────
+
+/// TTS narration output volume in [0.0, 1.0], stored as f32 bits so the
+/// speak worker threads can read it lock-free when creating each rodio
+/// sink. Mirrors `Settings::tts_volume`; initialised from saved settings
+/// at startup and updated live when the user scrolls the mouse wheel over
+/// the voice anchor (`update_setting` key `tts_volume`). 1.0 = unchanged.
+pub static TTS_VOLUME_BITS: AtomicU32 = AtomicU32::new(0x3f80_0000); // 1.0_f32
+
+/// Current TTS volume as a float, clamped to [0.0, 1.0].
+pub fn tts_volume() -> f32 {
+    f32::from_bits(TTS_VOLUME_BITS.load(Ordering::Relaxed)).clamp(0.0, 1.0)
+}
+
+/// Store a new TTS volume (clamped to [0.0, 1.0]). Called from
+/// `update_setting` and from the startup settings sync.
+pub fn set_tts_volume(v: f32) {
+    TTS_VOLUME_BITS.store(v.clamp(0.0, 1.0).to_bits(), Ordering::Relaxed);
+}

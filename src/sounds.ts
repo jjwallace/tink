@@ -1,8 +1,30 @@
-import { Howl } from "howler";
+import { Howl, Howler } from "howler";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 
 const cache = new Map<string, Howl>();
+
+/**
+ * Master output volume (0..1) — the single global control for ALL audio.
+ * Applied to every Howler SFX at once via `Howler.volume()` (which
+ * multiplies each sound's own relative volume), and mirrored to the Rust
+ * side (TTS narration) through the persisted `tts_volume` setting. The
+ * voice-anchor mouse-wheel is the UI that drives it; `setMasterVolume`
+ * is the one write path so SFX and speech always track together.
+ */
+let masterVolume = 1;
+
+/** Set the global output volume (0..1) for every SFX. Clamped. The Rust
+ *  TTS side is updated separately by the caller persisting `tts_volume`. */
+export function setMasterVolume(v: number) {
+  masterVolume = Math.max(0, Math.min(1, v));
+  Howler.volume(masterVolume);
+}
+
+/** Current master volume (0..1). */
+export function getMasterVolume() {
+  return masterVolume;
+}
 
 /**
  * True while the user is holding push-to-talk. Start/milestone/complete
@@ -147,6 +169,16 @@ export function preload() {
 
 export async function initSoundEvents(): Promise<UnlistenFn[]> {
   const unlisteners: UnlistenFn[] = [];
+
+  // Seed the global output volume from the persisted master value so SFX
+  // start at the same level the user last set with the anchor wheel. The
+  // Rust TTS side reads the same `tts_volume` on its own at startup.
+  try {
+    const s = await invoke<{ tts_volume?: number }>("get_all_settings");
+    if (typeof s?.tts_volume === "number") setMasterVolume(s.tts_volume);
+  } catch {
+    /* keep default 1.0 if settings fetch fails */
+  }
 
   // Start sound — plays once when Claude begins a turn
   unlisteners.push(

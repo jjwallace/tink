@@ -65,6 +65,7 @@ pub fn get_all_settings(
         "complete_enabled": s.complete_enabled,
         "stt_enabled": s.stt_enabled,
         "tts_enabled": s.tts_enabled,
+        "tts_volume": s.tts_volume,
         "work_mode": s.work_mode,
         "personality": s.personality,
         "start_sound": s.start_sound,
@@ -151,6 +152,11 @@ pub fn update_setting(
         "complete_enabled" => s.complete_enabled = value == "true",
         "stt_enabled" => s.stt_enabled = value == "true",
         "tts_enabled" => s.tts_enabled = value == "true",
+        "tts_volume" => {
+            let v = value.parse::<f32>().unwrap_or(1.0).clamp(0.0, 1.0);
+            s.tts_volume = v;
+            crate::state::set_tts_volume(v);
+        }
         "stt_model" => s.stt_model = value,
         "work_mode" => s.work_mode = value,
         "personality" => s.personality = value,

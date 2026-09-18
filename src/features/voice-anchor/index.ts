@@ -17,7 +17,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import gsap from "gsap";
 import { emit as emitParticle, forEachLive as forEachParticle } from "../ambient-vfx/particles";
-import { playSfx, startLoopSfx, stopLoopSfx, setMuted } from "../../sounds";
+import { playSfx, startLoopSfx, stopLoopSfx, setMuted, setMasterVolume } from "../../sounds";
 
 export interface AnchorPos {
   fx: number;
@@ -38,6 +38,14 @@ const EDGE_SPAWN_MIN = 30;       // particles spawn just inside/on the ring
 const EDGE_SPAWN_MAX = 42;
 const PARTICLE_SIZE = 1.8;
 const ARROW_EXPAND_DIST = 80;
+
+// Volume arc — a ring surrounding the orb, revealed on mouse-wheel. Drawn
+// on a pathLength=100 circle inside the SIZE×SIZE root's 0..100 viewBox,
+// so 1 unit = SIZE/100 px. r=24 → ~40.8 px radius (just outside the 27 px
+// orb). Background stroke is thicker than the white foreground per spec.
+const VOLUME_ARC_R = 24;
+const VOLUME_BG_STROKE = 4;    // dark, always-full background ring
+const VOLUME_FG_STROKE = 2.6;  // white volume indicator — thinner than bg
 
 // ── Mother glint — specular highlight pointing at the creature ──
 // Visible orb disc is 54 px (27 px radius). The glint sits just inside that
@@ -121,6 +129,15 @@ export class VoiceAnchor {
   private focusRing: SVGSVGElement | null = null;
   private focusRingCircle: SVGCircleElement | null = null;
   private focusMarchTween: gsap.core.Tween | null = null;
+  // Volume arc — 0..1 TTS narration volume + its SVG bits. Revealed while
+  // scrolling the wheel over the anchor, auto-fades after a beat.
+  private volume = 1;
+  private volumeRing: SVGSVGElement | null = null;
+  private volumeArcBg: SVGCircleElement | null = null;
+  private volumeArcFg: SVGCircleElement | null = null;
+  private volumeRevealTween: gsap.core.Tween | null = null;
+  private volumeHideTimer = 0;
+  private volumePersistTimer = 0;
   private listeners: ((pos: AnchorPos) => void)[] = [];
   private dragStartListeners: ((pos: AnchorPos) => void)[] = [];
   private dragEndListeners: ((pos: AnchorPos) => void)[] = [];
@@ -306,6 +323,83 @@ export class VoiceAnchor {
       this.focusRingCircle = circle;
     }
 
+    // Volume arc — revealed while the user scrolls the mouse wheel over
+    // the anchor. Two concentric strokes on a pathLength=100 circle so arc
+    // length is set as a percentage: a dark, translucent, always-full
+    // BACKGROUND ring and a thinner white FOREGROUND arc whose sweep = the
+    // current volume. Rotated -90° so the arc grows clockwise from 12
+    // o'clock. Sits above the disc/icon (z:3) but below the core ring and
+    // glint. Hidden (opacity 0) until a scroll reveals it.
+    {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 100 100");
+      Object.assign(svg.style, {
+        position: "absolute",
+        inset: "0",
+        width: "100%",
+        height: "100%",
+        // Hidden = opacity 0 AND visibility hidden (via GSAP autoAlpha),
+        // so the compositing layer isn't painted while dormant. A CSS
+        // `filter` here used to leave a faint rectangular glow-box on the
+        // transparent overlay window even at opacity 0 — the glow now
+        // lives in an in-SVG <filter> (below) that follows the stroke
+        // shapes instead of the element's bounding box.
+        opacity: "0",
+        visibility: "hidden",
+        "pointer-events": "none",
+        "z-index": "3",
+        overflow: "visible",
+      } as Partial<CSSStyleDeclaration>);
+
+      // Soft glow that hugs the arc strokes (not a box). feDropShadow with
+      // zero offset = a symmetric blur-glow; generous region avoids clipping.
+      const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+      const filter = document.createElementNS("http://www.w3.org/2000/svg", "filter");
+      filter.setAttribute("id", "vol-arc-glow");
+      filter.setAttribute("x", "-50%");
+      filter.setAttribute("y", "-50%");
+      filter.setAttribute("width", "200%");
+      filter.setAttribute("height", "200%");
+      const glow = document.createElementNS("http://www.w3.org/2000/svg", "feDropShadow");
+      glow.setAttribute("dx", "0");
+      glow.setAttribute("dy", "0");
+      glow.setAttribute("stdDeviation", "1.6");
+      glow.setAttribute("flood-color", "rgba(255,255,255,0.5)");
+      filter.appendChild(glow);
+      defs.appendChild(filter);
+      svg.appendChild(defs);
+
+      const mkArc = (stroke: string, width: number) => {
+        const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        c.setAttribute("cx", "50");
+        c.setAttribute("cy", "50");
+        c.setAttribute("r", String(VOLUME_ARC_R));
+        c.setAttribute("fill", "none");
+        c.setAttribute("stroke", stroke);
+        c.setAttribute("stroke-width", String(width));
+        c.setAttribute("pathLength", "100");
+        c.setAttribute("stroke-linecap", "round");
+        // Start at 12 o'clock and sweep clockwise.
+        c.setAttribute("transform", "rotate(-90 50 50)");
+        return c;
+      };
+
+      // Background: dark + translucent, always a full ring, thicker stroke.
+      const bg = mkArc("rgba(8,6,16,0.5)", VOLUME_BG_STROKE);
+      // Foreground: white, thinner, swept to the current volume level.
+      const fg = mkArc("rgba(255,255,255,0.95)", VOLUME_FG_STROKE);
+      fg.setAttribute("stroke-dasharray", "0 100");
+      fg.setAttribute("filter", "url(#vol-arc-glow)");
+
+      svg.appendChild(bg);
+      svg.appendChild(fg);
+      this.root.appendChild(svg);
+      this.volumeRing = svg;
+      this.volumeArcBg = bg;
+      this.volumeArcFg = fg;
+      this.renderVolumeArc();
+    }
+
     // Mother glint — 10 px dot with a tinted specular radial gradient.
     // Sits above everything (z:5) so it reads as a reflection on the
     // orb's surface; screen-blend makes it read as light rather than
@@ -358,6 +452,9 @@ export class VoiceAnchor {
     this.root.addEventListener("mouseenter", () => this.onHoverEnter());
     this.root.addEventListener("mouseleave", () => this.onHoverLeave());
     this.root.addEventListener("mousedown", (e) => this.onPressStart(e));
+    // Mouse-wheel over the anchor adjusts TTS volume + flashes the arc.
+    // passive:false so we can preventDefault the page scroll.
+    this.root.addEventListener("wheel", (e) => this.onWheel(e), { passive: false });
     // Right-click → pop the tray menu at the cursor (same items as the
     // system-tray icon, so users don't have to chase the menu bar).
     this.root.addEventListener("contextmenu", (e) => {
@@ -1276,7 +1373,7 @@ export class VoiceAnchor {
 
   private async refreshMuteStateFromSettings() {
     try {
-      const s = await invoke<{ work_mode?: string; anchor_bob?: boolean }>("get_all_settings");
+      const s = await invoke<{ work_mode?: string; anchor_bob?: boolean; tts_volume?: number }>("get_all_settings");
       const m = s?.work_mode;
       this.mode = m === "muted" || m === "focus" ? m : "iterate";
       this.applyMuteForMode();
@@ -1285,7 +1382,77 @@ export class VoiceAnchor {
       // (with both fields present) and on-demand via setBobbing() from
       // SettingsPanel when the toggle changes.
       if (s?.anchor_bob !== undefined) this.setBobbing(!!s.anchor_bob);
+      // Seed the volume arc AND the global SFX level so both read the
+      // saved master volume the first time the arc is shown / a sound plays.
+      if (typeof s?.tts_volume === "number") {
+        this.volume = Math.max(0, Math.min(1, s.tts_volume));
+        this.renderVolumeArc();
+        setMasterVolume(this.volume);
+      }
     } catch { /* ignore */ }
+  }
+
+  /** Set the white foreground arc's sweep from the current volume (0..1). */
+  private renderVolumeArc() {
+    if (!this.volumeArcFg) return;
+    const pct = Math.max(0, Math.min(1, this.volume)) * 100;
+    // pathLength is 100, so "<pct> 100" paints pct% then an all-gap
+    // remainder — i.e. an arc whose length is the volume fraction.
+    this.volumeArcFg.setAttribute("stroke-dasharray", `${pct.toFixed(2)} 100`);
+  }
+
+  /**
+   * Mouse-wheel over the anchor nudges the MASTER volume and flashes the
+   * arc. Scroll up (negative deltaY) raises volume. Delta is normalised so
+   * mouse notches (~±100) and trackpad swipes feel similar, and clamped
+   * per-event so a fast flick can't jump the whole range at once. The new
+   * level is applied to all SFX immediately via `setMasterVolume` (Howler
+   * global) and debounced to Rust settings (`tts_volume`) which scales TTS
+   * narration — so speech and effects track one control.
+   */
+  private onWheel(e: WheelEvent) {
+    e.preventDefault();
+    const step = Math.max(-0.15, Math.min(0.15, -e.deltaY * 0.0016));
+    const next = Math.max(0, Math.min(1, this.volume + step));
+    this.revealVolumeArc();
+    if (next === this.volume) return;
+    this.volume = next;
+    this.renderVolumeArc();
+    // Immediate: scale all frontend SFX to the new master level.
+    setMasterVolume(this.volume);
+    if (this.volumePersistTimer) clearTimeout(this.volumePersistTimer);
+    this.volumePersistTimer = window.setTimeout(() => {
+      // Persist + drive Rust-side TTS narration volume.
+      invoke("update_setting", { key: "tts_volume", value: this.volume.toFixed(3) }).catch(() => {});
+    }, 200);
+  }
+
+  /** Fade the arc in and thicken its stroke, then schedule a fade-out. */
+  private revealVolumeArc() {
+    const svg = this.volumeRing;
+    const bg = this.volumeArcBg;
+    const fg = this.volumeArcFg;
+    if (!svg || !bg || !fg) return;
+    if (this.volumeHideTimer) { clearTimeout(this.volumeHideTimer); this.volumeHideTimer = 0; }
+    this.volumeRevealTween?.kill();
+    // Entrance: opacity fades in AND the strokes thicken from a hairline.
+    gsap.set(bg, { attr: { "stroke-width": VOLUME_BG_STROKE * 0.4 } });
+    gsap.set(fg, { attr: { "stroke-width": VOLUME_FG_STROKE * 0.4 } });
+    this.volumeRevealTween = gsap.to(svg, {
+      autoAlpha: 1, duration: 0.18, ease: "power2.out", overwrite: "auto",
+    });
+    gsap.to(bg, { attr: { "stroke-width": VOLUME_BG_STROKE }, duration: 0.28, ease: "back.out(2)", overwrite: "auto" });
+    gsap.to(fg, { attr: { "stroke-width": VOLUME_FG_STROKE }, duration: 0.28, ease: "back.out(2)", overwrite: "auto" });
+    // Auto-dismiss ~1.1 s after the last scroll.
+    this.volumeHideTimer = window.setTimeout(() => this.hideVolumeArc(), 1100);
+  }
+
+  private hideVolumeArc() {
+    if (!this.volumeRing) return;
+    this.volumeRevealTween?.kill();
+    this.volumeRevealTween = gsap.to(this.volumeRing, {
+      autoAlpha: 0, duration: 0.5, ease: "power2.inOut", overwrite: "auto",
+    });
   }
 
   private bobRaf = 0;

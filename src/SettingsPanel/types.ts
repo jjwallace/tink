@@ -35,6 +35,7 @@ export interface AllSettings {
   sound_mode: string;
   stt_enabled: boolean;
   tts_enabled: boolean;
+  tts_volume: number;
   work_mode: string;
   personality: string;
   start_sound: string;

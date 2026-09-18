@@ -37,6 +37,9 @@ pub fn play(name: &str, assets_dir: &PathBuf) {
             eprintln!("SFX: can't create sink");
             return;
         };
+        // Honor the global master volume (shared with TTS narration) so all
+        // Rust-side audio tracks the one control the anchor wheel drives.
+        sink.set_volume(crate::state::tts_volume());
         sink.append(source);
         sink.sleep_until_end();
     });

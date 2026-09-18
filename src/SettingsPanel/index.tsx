@@ -102,6 +102,7 @@ export default function SettingsPanel() {
         sound_mode: "both",
         stt_enabled: true,
         tts_enabled: true,
+        tts_volume: 1,
         work_mode: "focus",
         personality: "ship-computer",
         start_sound: "start-quite",
